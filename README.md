@@ -111,6 +111,23 @@ natural para mejorar el SEO, puedes activar el enriquecido con IA:
    (modelo pequeno). Sin la clave definida, el sistema sigue funcionando igual,
    solo que con las plantillas base.
 
+## App aparte: "La Liga" (carpeta `liga/`)
+
+En este mismo repo, y sin ninguna relacion con el sitio de ofertas, esta la app
+privada de la liga entre amigos: registrar entradas, puntos, clasificaciones y
+campeon del dia/semana/mes. Instrucciones completas en
+[`liga/README.md`](liga/README.md).
+
+Arrancarla para usarla desde el movil (mismo wifi):
+
+```bash
+python scripts/servir_liga.py
+```
+
+**No se publica en GitHub Pages.** El sitio publico solo sirve la carpeta
+`docs/`, y `liga/` no esta ahi a proposito: los datos de la app (incluidas las
+fotos) se quedan en el navegador de cada uno y no se suben a ningun sitio.
+
 ## Que NO garantiza este sistema
 
 Ningun ingreso esta garantizado. El trafico de un sitio nuevo tarda meses en
