@@ -130,6 +130,19 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
 .fila-check { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: .88rem; }
 .fila-check input { width: 18px; height: 18px; accent-color: var(--acento); }
 
+.opciones-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.opcion-lista {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--fondo-2); border: 1px solid var(--borde);
+  border-radius: 10px; padding: 11px 12px; cursor: pointer; font-size: .88rem;
+}
+.opcion-lista.elegida { border-color: var(--acento); background: rgba(229, 72, 77, .08); }
+.opcion-lista input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--acento); flex: 0 0 auto; }
+.opcion-lista .ayuda { margin: 3px 0 0; }
+
+.zona-foto input[type=text] { margin-bottom: 4px; }
+.enlace-perfil { text-decoration: none; text-align: center; margin: 0 0 10px; }
+
 /* ---------- Botones ---------- */
 
 .btn {

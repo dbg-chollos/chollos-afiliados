@@ -39,7 +39,8 @@ cambiar tocándolo.
 2. **¿Fue de fiesta?** → De fiesta / Fuera de fiesta
 3. **Si fue de fiesta, ¿dónde?** → Discoteca / DJ · sala
 4. **Si no te rechazó, ¿cómo acabó?** → Más lío / Lío / Pico / Amigos / Nada
-5. **Si acabó en lío o más lío**, puedes añadir la foto para que la voten los demás
+5. **Si acabó en lío o más lío**, puedes añadir su Instagram para que la voten
+   los demás (ver abajo)
 
 Arriba se puede cambiar la fecha, por si apuntas al día siguiente lo de anoche.
 
@@ -106,7 +107,8 @@ cómodo si soléis salir juntos.
 **B. Cada uno en su móvil.** Cada uno apunta lo suyo y, cuando queráis
 actualizar la clasificación, en Ajustes:
 
-1. Cada uno le da a **Exportar** (o *Exportar con fotos* si queréis votar).
+1. Cada uno le da a **Exportar** (en modo enlace ya va todo lo necesario para
+   votar; *Exportar con fotos* solo hace falta si usáis el modo foto).
 2. Mandáis el archivo `.json` al grupo.
 3. Cada uno importa los de los demás con **Importar y fusionar** (no pisa lo
    tuyo: solo añade lo que le falta).
@@ -120,22 +122,41 @@ dispositivo y pone lo del archivo.
 
 - **Haced copias.** Si borras los datos de navegación del móvil o desinstalas
   la app, la liga se va con ellos. Exportad de vez en cuando.
-- **Espacio.** El navegador da unos 5 MB. Las fotos se reducen a 640 px y se
-  comprimen antes de guardarse (~40 KB cada una), así que caben de sobra las
-  de una liga, pero en Ajustes puedes ver lo que llevas ocupado. Si se llena, la
-  entrada se guarda igual y solo se pierde la foto, avisando.
-- **Las fotos no salen del móvil.** No se suben a ningún sitio, ni al repo, ni
-  a la web de chollos. Solo viajan si tú exportas *con fotos* y mandas el
-  archivo.
+- **Nada sale del móvil.** Ni entradas, ni enlaces, ni fotos. No se suben al
+  repo ni a la web de chollos. Solo viajan si tú exportas y mandas el archivo.
+- **Espacio.** El navegador da unos 5 MB. En modo enlace no ocupa
+  prácticamente nada. En modo foto se reducen a 640 px y se comprimen (~40 KB
+  cada una), así que caben de sobra, y en Ajustes ves lo que llevas ocupado. Si
+  se llena, la entrada se guarda igual y solo se pierde la foto, avisando.
 
-### Sobre subir fotos de alguien
+---
 
-Esto no es una advertencia de compromiso: subir la foto de una persona sin que
-lo sepa para que un grupo la puntúe puede salirte caro en España (derecho a la
-propia imagen, LO 1/1982, y protección de datos). Que la app las guarde solo en
-local reduce el problema, no lo elimina. La parte de fotos es opcional: **una
-entrada cuenta y puntúa igual sin foto**, lo único que pierdes es la nota de
-consenso. Vosotros decidís.
+## Cómo se valora a la pava (y por qué así)
+
+En Ajustes → *Fotos y valoraciones* hay tres modos:
+
+| Modo | Qué guarda la app |
+|---|---|
+| **Solo el enlace de Instagram** (por defecto) | El `@usuario` y nada más. Al votar, se abre su perfil en Instagram y vuelves a puntuar. **Cero imágenes guardadas.** |
+| **Guardar la foto en el móvil** | Una copia reducida, solo en ese dispositivo. |
+| **Sin fotos ni enlaces** | Nada. Solo puntos, la tabla de notas se queda vacía. |
+
+El modo enlace viene puesto por defecto a propósito, y te explico por qué:
+
+Que una foto sea pública en su Instagram **no la convierte en libre**. Lo que sí
+os cubre bastante es que esto sea uso privado: mientras se quede entre vosotros
+y no se publique en ningún sitio, cae en la excepción de "actividad
+exclusivamente personal o doméstica" del RGPD (art. 2.2.c). Lo que se sale de
+ahí es que se escape — y una copia guardada es algo que se puede filtrar,
+perder con el móvil o reenviar sin pensar; un enlace, no. Con el modo enlace la
+app nunca tiene una imagen suya: solo apunta a lo que ella misma publicó.
+
+Si aun así usáis el modo foto, en Ajustes tenéis un botón para **borrar todas
+las fotos guardadas** sin perder puntos ni notas, y *Exportar con fotos* avisa
+antes de meterlas en el archivo.
+
+Sea cual sea el modo: **una entrada cuenta y puntúa igual sin nada adjunto**,
+lo único que pierdes es la nota de consenso. La app tampoco guarda nombres.
 
 ---
 
@@ -147,8 +168,10 @@ consenso. Vosotros decidís.
    tienes: es público y cualquiera con la URL entraría.
 2. **Liga compartida de verdad** (que veas al momento lo que apuntan los otros y
    voten sin pasarse archivos). Eso sí necesita una base de datos: con Supabase
-   en su plan gratis es un fin de semana de trabajo, y ahí las fotos ya
-   estarían en un servidor, así que habría que pensarlo antes.
+   en su plan gratis es un fin de semana de trabajo. Con el modo enlace se
+   compartirían solo `@usuarios` y puntos, que es justo lo que hace que esa
+   opción sea razonable; subir imágenes a un servidor ya sería otra historia y
+   te lo desaconsejo.
 3. Ideas sueltas: rachas, motes/apodos para cada entrada, mapa de sitios,
    histórico de ligas anteriores, exportar la clasificación como imagen para el
    grupo.

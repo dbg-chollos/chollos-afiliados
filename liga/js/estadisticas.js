@@ -317,12 +317,12 @@
 
   // --- Entradas pendientes de votar ----------------------------------------
 
-  /** Fotos de los demas que `jugadorId` todavia no ha puntuado. */
+  /** Entradas de los demas (con foto o con enlace) que `jugadorId` no ha puntuado. */
   function pendientesDeVotar(estado, jugadorId) {
     return estado.entradas
       .filter(function (e) {
         if (e.jugadorId === jugadorId) return false;
-        if (!e.tieneFoto) return false;
+        if (!R.tieneMaterial(e)) return false;
         var votos = estado.votos[e.id] || {};
         return votos[jugadorId] === undefined;
       })

@@ -216,7 +216,8 @@
       fiesta: null,
       lugar: null,
       resultado: null,
-      foto: null
+      foto: null,
+      perfil: ''
     };
   }
 
@@ -310,18 +311,33 @@
       html += resuelto('resultado', 'Resultado', etiquetaResultado(b.resultado).etiqueta);
     }
 
-    // 5. Foto (solo lio y mas lio)
+    // 5. Que se les ensena a los demas para que la voten (solo lio y mas lio)
     var provisional = entradaProvisional();
-    if (R.admiteFoto(provisional)) {
-      html += bloquePaso('Foto para que la voten (opcional)',
-        '<div class="zona-foto">' +
-        (b.foto ? '<img src="' + b.foto + '" alt="">' : '') +
-        '<input type="file" id="reg-foto" accept="image/*" hidden>' +
-        '<button class="btn btn-secundario" type="button" id="reg-foto-btn">' +
-        (b.foto ? 'Cambiar foto' : 'Elegir foto') + '</button>' +
-        (b.foto ? ' <button class="btn btn-secundario" type="button" id="reg-foto-quitar">Quitar</button>' : '') +
-        '<p class="ayuda">Se guarda solo en este movil, reducida. Sin foto la entrada cuenta igual, pero nadie podra ponerle nota.</p>' +
-        '</div>', 'foto');
+    if (R.admiteFoto(provisional) && estado.reglas.modoFoto !== 'ninguna') {
+      if (estado.reglas.modoFoto === 'enlace') {
+        var perfil = R.perfilInstagram(b.perfil);
+        html += bloquePaso('Su Instagram, para que la voten (opcional)',
+          '<div class="zona-foto">' +
+          '<input type="text" id="reg-perfil" placeholder="@usuario" autocomplete="off" ' +
+          'autocapitalize="off" spellcheck="false" value="' + esc(b.perfil || '') + '">' +
+          (b.perfil && !perfil ? '<p class="ayuda" style="color:#ff8a8d">Eso no parece un usuario de Instagram.</p>' : '') +
+          (perfil ? '<p class="ayuda">Se guardara <strong>@' + esc(perfil.usuario) + '</strong>. Al votar se abre su perfil; ' +
+            'la app no guarda ninguna imagen.</p>'
+            : '<p class="ayuda">Solo se guarda el usuario, no la foto. Sin esto la entrada cuenta igual, ' +
+              'pero nadie podra ponerle nota.</p>') +
+          '</div>', 'foto');
+      } else {
+        html += bloquePaso('Foto para que la voten (opcional)',
+          '<div class="zona-foto">' +
+          (b.foto ? '<img src="' + b.foto + '" alt="">' : '') +
+          '<input type="file" id="reg-foto" accept="image/*" hidden>' +
+          '<button class="btn btn-secundario" type="button" id="reg-foto-btn">' +
+          (b.foto ? 'Cambiar foto' : 'Elegir foto') + '</button>' +
+          (b.foto ? ' <button class="btn btn-secundario" type="button" id="reg-foto-quitar">Quitar</button>' : '') +
+          '<p class="ayuda">Queda una copia guardada en este movil, reducida. Sin foto la entrada ' +
+          'cuenta igual, pero nadie podra ponerle nota.</p>' +
+          '</div>', 'foto');
+      }
     }
 
     // 6. Resumen y guardar
@@ -355,6 +371,7 @@
     var desde = orden.indexOf(campo);
     if (desde < 0) return;
     orden.slice(desde).forEach(function (c) { borrador[c] = null; });
+    if (desde <= orden.indexOf('foto')) borrador.perfil = '';
   }
 
   function conectarPasos() {
@@ -397,6 +414,16 @@
         });
       });
     }
+    var campoPerfil = $('#reg-perfil');
+    if (campoPerfil) {
+      // Solo se guarda al escribir; repintar en cada tecla robaria el foco.
+      campoPerfil.addEventListener('input', function () { borrador.perfil = this.value; });
+      campoPerfil.addEventListener('change', function () {
+        borrador.perfil = this.value;
+        pintarRegistrar();
+      });
+    }
+
     var quitarFoto = $('#reg-foto-quitar');
     if (quitarFoto) {
       quitarFoto.addEventListener('click', function () { borrador.foto = null; pintarRegistrar(); });
@@ -429,10 +456,16 @@
       fiesta: !!borrador.fiesta,
       lugar: borrador.fiesta ? borrador.lugar : null,
       resultado: borrador.rechazo ? 'nada' : borrador.resultado,
-      tieneFoto: false
+      tieneFoto: false,
+      perfil: null
     };
 
-    if (borrador.foto && R.admiteFoto(entrada)) {
+    if (R.admiteFoto(entrada) && estado.reglas.modoFoto === 'enlace') {
+      var perfil = R.perfilInstagram(borrador.perfil);
+      if (perfil) entrada.perfil = perfil.usuario;
+    }
+
+    if (borrador.foto && R.admiteFoto(entrada) && estado.reglas.modoFoto === 'local') {
       var res = D.guardarFoto(entrada.id, borrador.foto);
       if (res.ok) {
         entrada.tieneFoto = true;
@@ -472,7 +505,8 @@
       var nota = E.notaEntrada(estado, e);
       return '<li' + (fuera ? ' class="fuera-liga"' : '') + '>' +
         '<div class="info">' +
-        '<div class="titulo">' + titulo + (e.tieneFoto ? ' 📷' : '') + '</div>' +
+        '<div class="titulo">' + titulo + (e.tieneFoto ? ' 📷' : '') +
+        (e.perfil ? ' <span class="apagado">@' + esc(e.perfil) + '</span>' : '') + '</div>' +
         '<div class="meta">' + fechaCorta(e.fecha) + ' · ' + sitio +
         (nota ? ' · nota ' + R.redondea(nota.nota) + ' (' + nota.votos + ')' : '') +
         (fuera ? ' · fuera de liga' : '') +
@@ -626,9 +660,12 @@
         var mio = estado.votos[e.id][estado.yo];
         var consenso = E.notaEntrada(estado, e);
         var foto = e.tieneFoto ? D.leerFoto(e.id) : null;
+        var perfil = e.perfil ? R.perfilInstagram(e.perfil) : null;
         return '<li>' +
           (foto ? '<img class="mini-foto" src="' + foto + '" alt="">' : '') +
-          '<div class="info"><div class="titulo">' + esc(nombreDe(e.jugadorId)) + '</div>' +
+          '<div class="info"><div class="titulo">' + esc(nombreDe(e.jugadorId)) +
+          (perfil ? ' <a href="' + esc(perfil.url) + '" target="_blank" rel="noopener noreferrer">@' +
+            esc(perfil.usuario) + '</a>' : '') + '</div>' +
           '<div class="meta">' + fechaCorta(e.fecha) + ' · tu nota ' + mio +
           (consenso ? ' · consenso ' + R.redondea(consenso.nota) + ' (' + consenso.votos + ' votos)' : '') +
           '</div></div>' +
@@ -649,15 +686,25 @@
 
   function tarjetaVoto(e) {
     var foto = e.tieneFoto ? D.leerFoto(e.id) : null;
+    var perfil = e.perfil ? R.perfilInstagram(e.perfil) : null;
     var res = etiquetaResultado(e.resultado);
     var sitio = e.fiesta ? (e.lugar === 'dj' ? 'DJ / sala' : 'Discoteca') : 'Fuera de fiesta';
     var notas = '';
     for (var n = 1; n <= 10; n++) {
       notas += '<button class="nota-btn" type="button" data-entrada="' + e.id + '" data-nota="' + n + '">' + n + '</button>';
     }
-    return '<div class="voto-tarjeta">' +
-      (foto ? '<img src="' + foto + '" alt="Foto subida por ' + esc(nombreDe(e.jugadorId)) + '">'
-            : '<div class="vacio">La foto no esta en este dispositivo</div>') +
+
+    var cabecera;
+    if (foto) {
+      cabecera = '<img src="' + foto + '" alt="Foto subida por ' + esc(nombreDe(e.jugadorId)) + '">';
+    } else if (perfil) {
+      cabecera = '<a class="btn btn-secundario ancho enlace-perfil" target="_blank" rel="noopener noreferrer" ' +
+        'href="' + esc(perfil.url) + '">📷 Abrir @' + esc(perfil.usuario) + ' en Instagram</a>';
+    } else {
+      cabecera = '<div class="vacio">Esta entrada no tiene nada que ver</div>';
+    }
+
+    return '<div class="voto-tarjeta">' + cabecera +
       '<div class="fila-cabecera"><h3>' + esc(nombreDe(e.jugadorId)) + ' · ' + res.emoji + ' ' + esc(res.etiqueta) + '</h3>' +
       '<span class="contador">' + fechaCorta(e.fecha) + '</span></div>' +
       '<div class="meta apagado">' + sitio + '</div>' +
@@ -748,6 +795,20 @@
         '</li>';
     }).join('') || '<li class="vacio">Sin jugadores</li>';
 
+    $('#aj-modo-foto').innerHTML = R.MODOS_FOTO.map(function (m) {
+      return '<label class="opcion-lista' + (estado.reglas.modoFoto === m.id ? ' elegida' : '') + '">' +
+        '<input type="radio" name="modo-foto" value="' + m.id + '"' +
+        (estado.reglas.modoFoto === m.id ? ' checked' : '') + '>' +
+        '<span><strong>' + esc(m.etiqueta) + '</strong><br>' +
+        '<span class="ayuda">' + esc(m.detalle) + '</span></span></label>';
+    }).join('');
+
+    var conFotos = estado.entradas.filter(function (e) { return e.tieneFoto; }).length;
+    $('#aj-borrar-fotos').disabled = conFotos === 0;
+    $('#aj-borrar-fotos').textContent = conFotos
+      ? 'Borrar las ' + conFotos + ' fotos guardadas (los puntos y las notas se quedan)'
+      : 'No hay ninguna foto guardada en este dispositivo';
+
     $('#aj-tabla-puntos').innerHTML = R.RESULTADOS.map(function (res) {
       var p = estado.reglas.puntos[res.id] || { dentro: 0, fuera: 0 };
       return '<tr><td>' + res.emoji + ' ' + esc(res.etiqueta) + '</td>' +
@@ -790,6 +851,19 @@
         if (estado.yo === id) estado.yo = estado.jugadores.length ? estado.jugadores[0].id : null;
         persistir();
         pintar();
+      });
+    });
+
+    $$('#aj-modo-foto input').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        if (!radio.checked) return;
+        estado.reglas.modoFoto = radio.value;
+        borrador = nuevoBorrador();
+        persistir();
+        pintarAjustes();
+        aviso(radio.value === 'enlace' ? 'Se guardara solo el @usuario'
+          : radio.value === 'local' ? 'Se guardaran copias de las fotos en este movil'
+          : 'Sin fotos ni enlaces');
       });
     });
 
@@ -845,7 +919,11 @@
     });
 
     $('#aj-exportar').addEventListener('click', function () { descargar(false); });
-    $('#aj-exportar-fotos').addEventListener('click', function () { descargar(true); });
+    $('#aj-exportar-fotos').addEventListener('click', function () {
+      if (!confirm('El archivo llevara dentro las fotos guardadas. Una vez lo mandes ' +
+        'dejas de controlar donde acaba. ¿Seguro?')) return;
+      descargar(true);
+    });
 
     var modoImportacion = 'fusionar';
     $('#aj-importar-fusion').addEventListener('click', function () {
@@ -878,6 +956,15 @@
         }
       };
       lector.readAsText(file);
+    });
+
+    $('#aj-borrar-fotos').addEventListener('click', function () {
+      if (!confirm('Se borran las imagenes guardadas en este movil. Las entradas, los ' +
+        'puntos y las notas ya puestas se quedan. ¿Seguro?')) return;
+      var borradas = D.borrarTodasLasFotos(estado);
+      persistir();
+      aviso(borradas + ' fotos borradas de este dispositivo');
+      pintar();
     });
 
     $('#aj-borrar').addEventListener('click', function () {

@@ -29,14 +29,36 @@
     { id: 'dj', etiqueta: 'DJ / sala', emoji: '🎧' }
   ];
 
-  // Resultados que permiten subir foto para que la valoren los demas.
+  // Resultados que permiten adjuntar algo para que lo valoren los demas.
   var RESULTADOS_CON_FOTO = ['lio', 'mas_lio'];
+
+  // Como se le ensena la pava al resto para que la puntue.
+  var MODOS_FOTO = [
+    {
+      id: 'enlace',
+      etiqueta: 'Solo el enlace de Instagram',
+      detalle: 'No se guarda ninguna imagen: se guarda el @usuario y al votar se abre su perfil.'
+    },
+    {
+      id: 'local',
+      etiqueta: 'Guardar la foto en el movil',
+      detalle: 'Se guarda una copia reducida en este dispositivo. Mas comodo, pero es una copia que puede acabar donde no debe.'
+    },
+    {
+      id: 'ninguna',
+      etiqueta: 'Sin fotos ni enlaces',
+      detalle: 'Solo puntos. Nadie valora a nadie y la tabla de notas se queda vacia.'
+    }
+  ];
 
   // --- Reglas por defecto ---------------------------------------------------
 
   var REGLAS_DEFECTO = {
     // La liga termina cuando todos llegan a esta cifra de entradas.
     limiteLiga: 100,
+
+    // Por defecto, enlace: es lo que menos rastro deja.
+    modoFoto: 'enlace',
 
     // "Fuera de discoteca" puntua mas que "en discoteca" porque tiene mas merito.
     // Una sala con DJ cuenta como discoteca salvo que lo cambieis aqui.
@@ -81,9 +103,32 @@
     return esDentro(entrada, reglas) ? tabla.dentro : tabla.fuera;
   }
 
-  /** ¿Se puede subir foto de esta entrada para que la voten? */
+  /** ¿Se puede adjuntar algo a esta entrada para que la voten? */
   function admiteFoto(entrada) {
     return !entrada.rechazo && RESULTADOS_CON_FOTO.indexOf(entrada.resultado) !== -1;
+  }
+
+  /** ¿Hay algo que ensenar al resto — foto guardada o enlace a su perfil? */
+  function tieneMaterial(entrada) {
+    return !!(entrada.tieneFoto || entrada.perfil);
+  }
+
+  /**
+   * Normaliza lo que se escriba en el campo de Instagram: "@pepita",
+   * "pepita", "instagram.com/pepita" o la URL entera acaban igual.
+   * Devuelve null si no se parece a un usuario de Instagram.
+   */
+  function perfilInstagram(texto) {
+    if (!texto) return null;
+    var limpio = String(texto).trim();
+    if (!limpio) return null;
+    limpio = limpio.replace(/^https?:\/\//i, '')
+      .replace(/^(www\.)?instagram\.com\//i, '')
+      .replace(/^@/, '')
+      .split(/[/?#]/)[0]
+      .trim();
+    if (!/^[A-Za-z0-9._]{1,30}$/.test(limpio)) return null;
+    return { usuario: limpio, url: 'https://www.instagram.com/' + limpio + '/' };
   }
 
   /**
@@ -112,10 +157,13 @@
     RESULTADOS: RESULTADOS,
     LUGARES: LUGARES,
     RESULTADOS_CON_FOTO: RESULTADOS_CON_FOTO,
+    MODOS_FOTO: MODOS_FOTO,
     REGLAS_DEFECTO: REGLAS_DEFECTO,
     esDentro: esDentro,
     puntosDeEntrada: puntosDeEntrada,
     admiteFoto: admiteFoto,
+    tieneMaterial: tieneMaterial,
+    perfilInstagram: perfilInstagram,
     notaDeEntrada: notaDeEntrada,
     redondea: redondea
   };

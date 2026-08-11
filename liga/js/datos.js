@@ -51,6 +51,9 @@
       djCuentaComoDiscoteca: reglas.djCuentaComoDiscoteca !== undefined
         ? !!reglas.djCuentaComoDiscoteca
         : defecto.djCuentaComoDiscoteca,
+      modoFoto: ['enlace', 'local', 'ninguna'].indexOf(reglas.modoFoto) !== -1
+        ? reglas.modoFoto
+        : defecto.modoFoto,
       puntos: Object.assign({}, defecto.puntos, reglas.puntos || {}),
       votosMinimos: Number(reglas.votosMinimos) > 0 ? Number(reglas.votosMinimos) : defecto.votosMinimos,
       pesos: Object.assign({}, defecto.pesos, reglas.pesos || {})
@@ -214,6 +217,21 @@
     return { estado: resultado, fotosFallidas: fallos };
   }
 
+  /**
+   * Borra las imagenes guardadas pero deja las entradas, los puntos y los
+   * votos como estan. Es la salida rapida si os arrepentis de tener copias.
+   */
+  function borrarTodasLasFotos(estado) {
+    var borradas = 0;
+    estado.entradas.forEach(function (e) {
+      if (!e.tieneFoto) return;
+      borrarFoto(e.id);
+      e.tieneFoto = false;
+      borradas++;
+    });
+    return borradas;
+  }
+
   function borrarTodo() {
     var claves = [];
     for (var i = 0; i < localStorage.length; i++) {
@@ -238,6 +256,7 @@
     comprimirImagen: comprimirImagen,
     exportar: exportar,
     importar: importar,
+    borrarTodasLasFotos: borrarTodasLasFotos,
     borrarTodo: borrarTodo
   };
 

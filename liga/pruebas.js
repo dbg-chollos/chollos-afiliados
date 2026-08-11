@@ -84,6 +84,30 @@ comprueba('solo lio y mas lio admiten foto',
   ],
   [true, true, false, false]);
 
+console.log('\nPerfiles de Instagram');
+
+comprueba('acepta el usuario a secas',
+  R.perfilInstagram('pepita_23'), { usuario: 'pepita_23', url: 'https://www.instagram.com/pepita_23/' });
+
+comprueba('quita la arroba, los espacios y las mayusculas de la URL',
+  R.perfilInstagram('  @Pepita_23 ').usuario, 'Pepita_23');
+
+comprueba('acepta la URL entera con parametros',
+  R.perfilInstagram('https://www.instagram.com/pepita_23/?hl=es').usuario, 'pepita_23');
+
+comprueba('acepta el dominio sin protocolo',
+  R.perfilInstagram('instagram.com/pepita_23').usuario, 'pepita_23');
+
+comprueba('rechaza lo que no es un usuario',
+  [R.perfilInstagram(''), R.perfilInstagram('   '), R.perfilInstagram('no vale esto'), R.perfilInstagram(null)],
+  [null, null, null, null]);
+
+comprueba('hay algo que votar tanto con foto como con enlace',
+  [R.tieneMaterial({ tieneFoto: true }),
+   R.tieneMaterial({ perfil: 'pepita' }),
+   R.tieneMaterial({ tieneFoto: false, perfil: null })],
+  [true, true, false]);
+
 // --- Notas ----------------------------------------------------------------
 
 console.log('\nNotas de consenso');
@@ -177,6 +201,15 @@ comprueba('sin votos, cada uno tiene pendiente la foto del otro',
   [E.pendientesDeVotar(sinVotar, 'a').map(function (e) { return e.id; }),
    E.pendientesDeVotar(sinVotar, 'b').map(function (e) { return e.id; })],
   [['b2'], ['a1']]);
+
+var conEnlace = estadoDemo();
+conEnlace.votos = {};
+conEnlace.entradas.push(entrada({
+  id: 'b3', jugadorId: 'b', fecha: '2026-08-03T22:00:00.000Z',
+  resultado: 'mas_lio', tieneFoto: false, perfil: 'pepita_23'
+}));
+comprueba('una entrada con solo enlace tambien se puede votar',
+  E.pendientesDeVotar(conEnlace, 'a').map(function (e) { return e.id; }), ['b3', 'b2']);
 
 var terminada = estadoDemo();
 terminada.reglas.limiteLiga = 2;
