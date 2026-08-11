@@ -35,14 +35,14 @@
   // Como se le ensena la pava al resto para que la puntue.
   var MODOS_FOTO = [
     {
+      id: 'local',
+      etiqueta: 'Subir la foto',
+      detalle: 'Se guarda una copia reducida en este movil y nada mas. Es lo mas comodo para votar.'
+    },
+    {
       id: 'enlace',
       etiqueta: 'Solo el enlace de Instagram',
       detalle: 'No se guarda ninguna imagen: se guarda el @usuario y al votar se abre su perfil.'
-    },
-    {
-      id: 'local',
-      etiqueta: 'Guardar la foto en el movil',
-      detalle: 'Se guarda una copia reducida en este dispositivo. Mas comodo, pero es una copia que puede acabar donde no debe.'
     },
     {
       id: 'ninguna',
@@ -57,8 +57,9 @@
     // La liga termina cuando todos llegan a esta cifra de entradas.
     limiteLiga: 100,
 
-    // Por defecto, enlace: es lo que menos rastro deja.
-    modoFoto: 'enlace',
+    // Foto por defecto. Con 'enlace' se guarda solo el @usuario y no una
+    // imagen, que deja mucho menos rastro si algun dia lo preferis.
+    modoFoto: 'local',
 
     // "Fuera de discoteca" puntua mas que "en discoteca" porque tiene mas merito.
     // Una sala con DJ cuenta como discoteca salvo que lo cambieis aqui.

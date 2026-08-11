@@ -597,12 +597,12 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
     <div class="tarjeta">
       <h2>Lo que conviene tener claro</h2>
       <p class="ayuda">
-        Nada de esto sale de este dispositivo: ni entradas, ni enlaces, ni fotos.
-        Que una foto sea publica en Instagram no la hace libre, pero mientras
-        esto se quede entre vosotros y no se publique en ningun sitio, es uso
-        privado. El problema no es tenerlo: es que se escape. Por eso el modo
-        recomendado guarda solo el @usuario y no una copia de la imagen, y por
-        eso conviene no reenviar por ahi los archivos que exportes.
+        Nada de esto sale de este dispositivo: ni entradas, ni fotos. Mientras
+        se quede entre vosotros y no se publique en ningun sitio, es uso
+        privado. Lo unico que hay que cuidar es que no se escape: no reenvieis
+        por ahi los archivos que exporteis con fotos, y si en algun momento
+        preferis no tener copias, arriba podeis borrarlas todas de golpe sin
+        perder puntos ni notas.
       </p>
     </div>
   </section>
@@ -663,14 +663,14 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
   // Como se le ensena la pava al resto para que la puntue.
   var MODOS_FOTO = [
     {
+      id: 'local',
+      etiqueta: 'Subir la foto',
+      detalle: 'Se guarda una copia reducida en este movil y nada mas. Es lo mas comodo para votar.'
+    },
+    {
       id: 'enlace',
       etiqueta: 'Solo el enlace de Instagram',
       detalle: 'No se guarda ninguna imagen: se guarda el @usuario y al votar se abre su perfil.'
-    },
-    {
-      id: 'local',
-      etiqueta: 'Guardar la foto en el movil',
-      detalle: 'Se guarda una copia reducida en este dispositivo. Mas comodo, pero es una copia que puede acabar donde no debe.'
     },
     {
       id: 'ninguna',
@@ -685,8 +685,9 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
     // La liga termina cuando todos llegan a esta cifra de entradas.
     limiteLiga: 100,
 
-    // Por defecto, enlace: es lo que menos rastro deja.
-    modoFoto: 'enlace',
+    // Foto por defecto. Con 'enlace' se guarda solo el @usuario y no una
+    // imagen, que deja mucho menos rastro si algun dia lo preferis.
+    modoFoto: 'local',
 
     // "Fuera de discoteca" puntua mas que "en discoteca" porque tiene mas merito.
     // Una sala con DJ cuenta como discoteca salvo que lo cambieis aqui.

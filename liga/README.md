@@ -39,8 +39,8 @@ cambiar tocándolo.
 2. **¿Fue de fiesta?** → De fiesta / Fuera de fiesta
 3. **Si fue de fiesta, ¿dónde?** → Discoteca / DJ · sala
 4. **Si no te rechazó, ¿cómo acabó?** → Más lío / Lío / Pico / Amigos / Nada
-5. **Si acabó en lío o más lío**, puedes añadir su Instagram para que la voten
-   los demás (ver abajo)
+5. **Si acabó en lío o más lío**, puedes añadir la foto para que la voten los
+   demás (ver abajo)
 
 Arriba se puede cambiar la fecha, por si apuntas al día siguiente lo de anoche.
 
@@ -107,8 +107,8 @@ cómodo si soléis salir juntos.
 **B. Cada uno en su móvil.** Cada uno apunta lo suyo y, cuando queráis
 actualizar la clasificación, en Ajustes:
 
-1. Cada uno le da a **Exportar** (en modo enlace ya va todo lo necesario para
-   votar; *Exportar con fotos* solo hace falta si usáis el modo foto).
+1. Cada uno le da a **Exportar con fotos** (si usáis el modo enlace, con
+   *Exportar* a secas ya va todo lo necesario para votar).
 2. Mandáis el archivo `.json` al grupo.
 3. Cada uno importa los de los demás con **Importar y fusionar** (no pisa lo
    tuyo: solo añade lo que le falta).
@@ -137,23 +137,22 @@ En Ajustes → *Fotos y valoraciones* hay tres modos:
 
 | Modo | Qué guarda la app |
 |---|---|
-| **Solo el enlace de Instagram** (por defecto) | El `@usuario` y nada más. Al votar, se abre su perfil en Instagram y vuelves a puntuar. **Cero imágenes guardadas.** |
-| **Guardar la foto en el móvil** | Una copia reducida, solo en ese dispositivo. |
+| **Subir la foto** (por defecto) | Una copia reducida, solo en ese dispositivo. Es lo más cómodo para votar. |
+| **Solo el enlace de Instagram** | El `@usuario` y nada más. Al votar se abre su perfil en Instagram. **Cero imágenes guardadas.** |
 | **Sin fotos ni enlaces** | Nada. Solo puntos, la tabla de notas se queda vacía. |
 
-El modo enlace viene puesto por defecto a propósito, y te explico por qué:
+Lo que conviene tener en la cabeza, sea cual sea el modo: mientras esto se
+quede entre vosotros y no se publique en ningún sitio, es uso privado y cae en
+la excepción de "actividad exclusivamente personal o doméstica" del RGPD
+(art. 2.2.c). Lo que se sale de ahí es que se escape, y una copia guardada es
+lo que se puede filtrar, perder con el móvil o reenviar sin pensar. De ahí las
+dos salidas que tenéis en Ajustes: un botón para **borrar todas las fotos
+guardadas** sin perder puntos ni notas, y el aviso de *Exportar con fotos*
+antes de meterlas en un archivo que va a salir del móvil.
 
-Que una foto sea pública en su Instagram **no la convierte en libre**. Lo que sí
-os cubre bastante es que esto sea uso privado: mientras se quede entre vosotros
-y no se publique en ningún sitio, cae en la excepción de "actividad
-exclusivamente personal o doméstica" del RGPD (art. 2.2.c). Lo que se sale de
-ahí es que se escape — y una copia guardada es algo que se puede filtrar,
-perder con el móvil o reenviar sin pensar; un enlace, no. Con el modo enlace la
-app nunca tiene una imagen suya: solo apunta a lo que ella misma publicó.
-
-Si aun así usáis el modo foto, en Ajustes tenéis un botón para **borrar todas
-las fotos guardadas** sin perder puntos ni notas, y *Exportar con fotos* avisa
-antes de meterlas en el archivo.
+El modo enlace está ahí por si algún día preferís no tener copias: funciona
+igual para votar, solo que abriendo su perfil en vez de enseñar una imagen
+guardada.
 
 Sea cual sea el modo: **una entrada cuenta y puntúa igual sin nada adjunto**,
 lo único que pierdes es la nota de consenso. La app tampoco guarda nombres.
@@ -168,10 +167,9 @@ lo único que pierdes es la nota de consenso. La app tampoco guarda nombres.
    tienes: es público y cualquiera con la URL entraría.
 2. **Liga compartida de verdad** (que veas al momento lo que apuntan los otros y
    voten sin pasarse archivos). Eso sí necesita una base de datos: con Supabase
-   en su plan gratis es un fin de semana de trabajo. Con el modo enlace se
-   compartirían solo `@usuarios` y puntos, que es justo lo que hace que esa
-   opción sea razonable; subir imágenes a un servidor ya sería otra historia y
-   te lo desaconsejo.
+   en su plan gratis es un fin de semana de trabajo. Ahí habría que decidir qué
+   se sube: puntos y entradas es directo; las fotos ya significan tenerlas en
+   un servidor y no solo en vuestros móviles, que es otra cosa.
 3. Ideas sueltas: rachas, motes/apodos para cada entrada, mapa de sitios,
    histórico de ligas anteriores, exportar la clasificación como imagen para el
    grupo.
