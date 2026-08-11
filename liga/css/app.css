@@ -347,6 +347,7 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
   line-height: 1.5; margin-bottom: 12px;
 }
 .aviso.suave { background: var(--fondo-2); border: 1px solid var(--borde); color: var(--apagado); }
+.aviso.temporal { background: #3a2a12; border: 1px solid #6b4a17; color: #ffd08a; }
 
 .aviso-flotante {
   position: fixed;

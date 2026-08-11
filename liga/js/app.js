@@ -1080,8 +1080,20 @@
     conectar();
     pintar();
 
-    if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
-      navigator.serviceWorker.register('sw.js').catch(function () { /* sin conexion offline, no pasa nada */ });
+    if (!D.guardadoPermanente()) {
+      var banda = $('#aviso-temporal');
+      banda.innerHTML = '⚠️ <strong>Aqui no se guarda nada al cerrar.</strong> Este navegador ' +
+        'no deja guardar datos (navegacion privada, cookies bloqueadas o la app abierta dentro ' +
+        'de otra pagina). Puedes trastear todo lo que quieras, pero al cerrar la pestana se ' +
+        'pierde. Para usarla de verdad, abrela como app en el movil.';
+      banda.hidden = false;
+    }
+
+    // Solo en la version de varios archivos: la de archivo unico no lleva
+    // manifiesto ni sw.js al lado, y pedirlos daria un 404 en la consola.
+    var esInstalable = !!document.querySelector('link[rel="manifest"]');
+    if (esInstalable && 'serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+      navigator.serviceWorker.register('sw.js').catch(function () { /* sin modo offline, no pasa nada */ });
     }
   });
 })();

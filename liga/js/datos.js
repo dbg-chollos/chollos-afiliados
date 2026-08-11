@@ -14,6 +14,38 @@
 
   var COLORES = ['#e5484d', '#3e63dd', '#30a46c', '#f76b15', '#8e4ec6', '#0d9488', '#d6409f', '#a18072'];
 
+  /**
+   * Normalmente escribimos en localStorage. Pero hay sitios donde el navegador
+   * no deja: navegacion privada, cookies bloqueadas, o la app abierta dentro de
+   * otra pagina. Ahi tirar de memoria es feo (al cerrar se pierde) pero es
+   * mucho mejor que reventar a la primera entrada.
+   */
+  var almacen = (function () {
+    try {
+      var prueba = '__liga_prueba__';
+      localStorage.setItem(prueba, '1');
+      localStorage.removeItem(prueba);
+      return { permanente: true, api: localStorage };
+    } catch (err) {
+      var memoria = {};
+      return {
+        permanente: false,
+        api: {
+          getItem: function (k) {
+            return Object.prototype.hasOwnProperty.call(memoria, k) ? memoria[k] : null;
+          },
+          setItem: function (k, v) { memoria[k] = String(v); },
+          removeItem: function (k) { delete memoria[k]; },
+          key: function (i) { return Object.keys(memoria)[i]; },
+          get length() { return Object.keys(memoria).length; }
+        }
+      };
+    }
+  })();
+
+  /** ¿Se esta guardando de verdad, o solo hasta que se cierre la pestana? */
+  function guardadoPermanente() { return almacen.permanente; }
+
   function id() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
@@ -68,7 +100,7 @@
 
   function cargar() {
     try {
-      var crudo = localStorage.getItem(CLAVE);
+      var crudo = almacen.api.getItem(CLAVE);
       if (!crudo) return estadoInicial();
       return normaliza(JSON.parse(crudo));
     } catch (err) {
@@ -79,7 +111,7 @@
 
   function guardar(estado) {
     try {
-      localStorage.setItem(CLAVE, JSON.stringify(estado));
+      almacen.api.setItem(CLAVE, JSON.stringify(estado));
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err };
@@ -90,7 +122,7 @@
 
   function guardarFoto(entradaId, dataUrl) {
     try {
-      localStorage.setItem(CLAVE_FOTO + entradaId, dataUrl);
+      almacen.api.setItem(CLAVE_FOTO + entradaId, dataUrl);
       return { ok: true };
     } catch (err) {
       // Cuota llena: es el fallo mas probable de toda la app.
@@ -100,7 +132,7 @@
 
   function leerFoto(entradaId) {
     try {
-      return localStorage.getItem(CLAVE_FOTO + entradaId);
+      return almacen.api.getItem(CLAVE_FOTO + entradaId);
     } catch (err) {
       return null;
     }
@@ -108,16 +140,16 @@
 
   function borrarFoto(entradaId) {
     try {
-      localStorage.removeItem(CLAVE_FOTO + entradaId);
+      almacen.api.removeItem(CLAVE_FOTO + entradaId);
     } catch (err) { /* da igual */ }
   }
 
   function espacioUsado() {
     var total = 0;
     try {
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf('liga.') === 0) total += (localStorage.getItem(k) || '').length;
+      for (var i = 0; i < almacen.api.length; i++) {
+        var k = almacen.api.key(i);
+        if (k && k.indexOf('liga.') === 0) total += (almacen.api.getItem(k) || '').length;
       }
     } catch (err) { /* nada */ }
     return total * 2; // UTF-16: ~2 bytes por caracter
@@ -234,11 +266,11 @@
 
   function borrarTodo() {
     var claves = [];
-    for (var i = 0; i < localStorage.length; i++) {
-      var k = localStorage.key(i);
+    for (var i = 0; i < almacen.api.length; i++) {
+      var k = almacen.api.key(i);
       if (k && k.indexOf('liga.') === 0) claves.push(k);
     }
-    claves.forEach(function (k) { localStorage.removeItem(k); });
+    claves.forEach(function (k) { almacen.api.removeItem(k); });
   }
 
   var api = {
@@ -249,6 +281,7 @@
     normaliza: normaliza,
     cargar: cargar,
     guardar: guardar,
+    guardadoPermanente: guardadoPermanente,
     guardarFoto: guardarFoto,
     leerFoto: leerFoto,
     borrarFoto: borrarFoto,
