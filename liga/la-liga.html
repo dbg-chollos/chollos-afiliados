@@ -688,6 +688,9 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
     // Foto por defecto. Con 'enlace' se guarda solo el @usuario y no una
     // imagen, que deja mucho menos rastro si algun dia lo preferis.
     modoFoto: 'local',
+    // Se pone a true en cuanto alguien elige el modo a mano en Ajustes. Ver
+    // el comentario en datos.js: mientras sea false, mandan estos valores.
+    modoFotoElegido: false,
 
     // "Fuera de discoteca" puntua mas que "en discoteca" porque tiene mas merito.
     // Una sala con DJ cuenta como discoteca salvo que lo cambieis aqui.
@@ -887,9 +890,14 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
       djCuentaComoDiscoteca: reglas.djCuentaComoDiscoteca !== undefined
         ? !!reglas.djCuentaComoDiscoteca
         : defecto.djCuentaComoDiscoteca,
-      modoFoto: ['enlace', 'local', 'ninguna'].indexOf(reglas.modoFoto) !== -1
+      // Solo se respeta el modo guardado si lo eligio alguien a mano en
+      // Ajustes. Si venia puesto de serie, manda el de la version de ahora:
+      // asi un cambio de criterio llega a los moviles que ya la tenian abierta,
+      // en vez de quedarse con el de la primera vez que la instalaron.
+      modoFoto: reglas.modoFotoElegido && ['enlace', 'local', 'ninguna'].indexOf(reglas.modoFoto) !== -1
         ? reglas.modoFoto
         : defecto.modoFoto,
+      modoFotoElegido: !!reglas.modoFotoElegido,
       puntos: Object.assign({}, defecto.puntos, reglas.puntos || {}),
       votosMinimos: Number(reglas.votosMinimos) > 0 ? Number(reglas.votosMinimos) : defecto.votosMinimos,
       pesos: Object.assign({}, defecto.pesos, reglas.pesos || {})
@@ -1792,8 +1800,8 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
           '<div class="zona-foto">' +
           (b.foto ? '<img src="' + b.foto + '" alt="">' : '') +
           '<input type="file" id="reg-foto" accept="image/*" hidden>' +
-          '<button class="btn btn-secundario" type="button" id="reg-foto-btn">' +
-          (b.foto ? 'Cambiar foto' : 'Elegir foto') + '</button>' +
+          '<button class="btn btn-principal ancho" type="button" id="reg-foto-btn">' +
+          (b.foto ? '🖼 Cambiar foto' : '🖼 Elegir foto de la galeria') + '</button>' +
           (b.foto ? ' <button class="btn btn-secundario" type="button" id="reg-foto-quitar">Quitar</button>' : '') +
           '<p class="ayuda">Queda una copia guardada en este movil, reducida. Sin foto la entrada ' +
           'cuenta igual, pero nadie podra ponerle nota.</p>' +
@@ -2319,6 +2327,7 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
       radio.addEventListener('change', function () {
         if (!radio.checked) return;
         estado.reglas.modoFoto = radio.value;
+        estado.reglas.modoFotoElegido = true; // a partir de aqui manda lo que elija el
         borrador = nuevoBorrador();
         persistir();
         pintarAjustes();

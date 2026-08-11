@@ -9,6 +9,7 @@
 
 var R = require('./js/reglas.js');
 var E = require('./js/estadisticas.js');
+var D = require('./js/datos.js');
 
 var fallos = 0;
 var total = 0;
@@ -227,6 +228,31 @@ comprueba('el domingo pertenece a la semana que empezo el lunes anterior',
 
 comprueba('el lunes siguiente ya es otra semana',
   E.claveSemana('2026-08-10T12:00:00') === E.claveSemana('2026-08-03T12:00:00'), false);
+
+console.log('\nLigas ya guardadas al abrir una version nueva');
+
+function normalizada(reglas) {
+  return D.normaliza({ jugadores: [], entradas: [], votos: {}, reglas: reglas }).reglas;
+}
+
+comprueba('un modo que venia de serie se actualiza al de la version nueva',
+  normalizada({ modoFoto: 'enlace' }).modoFoto, R.REGLAS_DEFECTO.modoFoto);
+
+comprueba('un modo elegido a mano se respeta',
+  normalizada({ modoFoto: 'enlace', modoFotoElegido: true }).modoFoto, 'enlace');
+
+comprueba('tambien se respeta cuando eligieron el mismo que trae por defecto',
+  normalizada({ modoFoto: 'ninguna', modoFotoElegido: true }).modoFoto, 'ninguna');
+
+comprueba('un modo inventado no cuela ni eligiendolo a mano',
+  normalizada({ modoFoto: 'loquesea', modoFotoElegido: true }).modoFoto, R.REGLAS_DEFECTO.modoFoto);
+
+comprueba('el resto de ajustes suyos no se tocan',
+  [normalizada({ limiteLiga: 50, votosMinimos: 3 }).limiteLiga,
+   normalizada({ limiteLiga: 50, votosMinimos: 3 }).votosMinimos,
+   normalizada({ djCuentaComoDiscoteca: false }).djCuentaComoDiscoteca,
+   normalizada({ puntos: { lio: { dentro: 9, fuera: 9 } } }).puntos.lio],
+  [50, 3, false, { dentro: 9, fuera: 9 }]);
 
 // --- Resultado ------------------------------------------------------------
 

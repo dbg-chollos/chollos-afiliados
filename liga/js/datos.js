@@ -83,9 +83,14 @@
       djCuentaComoDiscoteca: reglas.djCuentaComoDiscoteca !== undefined
         ? !!reglas.djCuentaComoDiscoteca
         : defecto.djCuentaComoDiscoteca,
-      modoFoto: ['enlace', 'local', 'ninguna'].indexOf(reglas.modoFoto) !== -1
+      // Solo se respeta el modo guardado si lo eligio alguien a mano en
+      // Ajustes. Si venia puesto de serie, manda el de la version de ahora:
+      // asi un cambio de criterio llega a los moviles que ya la tenian abierta,
+      // en vez de quedarse con el de la primera vez que la instalaron.
+      modoFoto: reglas.modoFotoElegido && ['enlace', 'local', 'ninguna'].indexOf(reglas.modoFoto) !== -1
         ? reglas.modoFoto
         : defecto.modoFoto,
+      modoFotoElegido: !!reglas.modoFotoElegido,
       puntos: Object.assign({}, defecto.puntos, reglas.puntos || {}),
       votosMinimos: Number(reglas.votosMinimos) > 0 ? Number(reglas.votosMinimos) : defecto.votosMinimos,
       pesos: Object.assign({}, defecto.pesos, reglas.pesos || {})

@@ -60,6 +60,9 @@
     // Foto por defecto. Con 'enlace' se guarda solo el @usuario y no una
     // imagen, que deja mucho menos rastro si algun dia lo preferis.
     modoFoto: 'local',
+    // Se pone a true en cuanto alguien elige el modo a mano en Ajustes. Ver
+    // el comentario en datos.js: mientras sea false, mandan estos valores.
+    modoFotoElegido: false,
 
     // "Fuera de discoteca" puntua mas que "en discoteca" porque tiene mas merito.
     // Una sala con DJ cuenta como discoteca salvo que lo cambieis aqui.

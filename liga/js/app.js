@@ -331,8 +331,8 @@
           '<div class="zona-foto">' +
           (b.foto ? '<img src="' + b.foto + '" alt="">' : '') +
           '<input type="file" id="reg-foto" accept="image/*" hidden>' +
-          '<button class="btn btn-secundario" type="button" id="reg-foto-btn">' +
-          (b.foto ? 'Cambiar foto' : 'Elegir foto') + '</button>' +
+          '<button class="btn btn-principal ancho" type="button" id="reg-foto-btn">' +
+          (b.foto ? '🖼 Cambiar foto' : '🖼 Elegir foto de la galeria') + '</button>' +
           (b.foto ? ' <button class="btn btn-secundario" type="button" id="reg-foto-quitar">Quitar</button>' : '') +
           '<p class="ayuda">Queda una copia guardada en este movil, reducida. Sin foto la entrada ' +
           'cuenta igual, pero nadie podra ponerle nota.</p>' +
@@ -858,6 +858,7 @@
       radio.addEventListener('change', function () {
         if (!radio.checked) return;
         estado.reglas.modoFoto = radio.value;
+        estado.reglas.modoFotoElegido = true; // a partir de aqui manda lo que elija el
         borrador = nuevoBorrador();
         persistir();
         pintarAjustes();
