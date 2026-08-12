@@ -24,6 +24,12 @@ jobs:
       - name: Ejecutar pipeline de contenido
         run: python scripts/run_pipeline.py
 
+      # Cerrojo: el sitio de ofertas y la app privada de la liga son cosas
+      # separadas. Si algo de la app aparece en docs/, este paso falla y no se
+      # publica nada. Mejor un despliegue en rojo que una web con lo que no toca.
+      - name: Comprobar que la app de la liga no esta en el sitio
+        run: python scripts/comprobar_separacion.py
+
       - name: Publicar productos nuevos en Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
