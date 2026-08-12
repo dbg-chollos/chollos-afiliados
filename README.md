@@ -124,14 +124,13 @@ Arrancarla para usarla desde el movil (mismo wifi):
 python scripts/servir_liga.py
 ```
 
-Se publica junto al sitio, en `/liga/`, para que cada uno pueda instalarla en su
-movil sin depender de ningun ordenador encendido. `build_site.py` la copia a
-`docs/liga/` en cada ejecucion (la funcion `copy_liga_app`), porque el pipeline
-borra y regenera `docs/` entero. Va con `noindex` y con `Disallow: /liga/` en
-robots.txt, y fuera del sitemap: no aparece en Google ni enlazada desde el sitio.
+**No se publica en este sitio.** El sitio de ofertas y la app son dos webs
+distintas en dos dominios distintos, a proposito: `docs/` (lo que ve todo el
+mundo) no contiene ni una linea de la app.
 
-**Lo que se publica es el programa, no los datos.** La app no lleva nada dentro:
-jugadores, entradas, fotos y votos se guardan en el navegador de cada movil.
+Para publicarla en su propio alojamiento, `scripts/preparar_web_liga.py` deja en
+`dist-liga/` lo justo para servirla, y `netlify.toml` hace que Netlify lo coja
+solo al conectar el repositorio. Ver `liga/README.md`.
 
 ## Que NO garantiza este sistema
 

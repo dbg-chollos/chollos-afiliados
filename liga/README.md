@@ -13,19 +13,23 @@ en el navegador del móvil que la usa**. Coste 0€, igual que el resto del repo
 **Opción rápida (probarla en el ordenador):** doble clic en `liga/index.html`.
 Funciona todo menos instalarla como app.
 
-**Opción buena (cada uno en su móvil, sin depender de nadie):** una vez esta
-rama esté en `main`, la app queda publicada en
+**Opción buena (cada uno en su móvil, sin depender de nadie):** publicarla en su
+propio alojamiento, **con su propio dominio, sin ninguna relación con el sitio
+de ofertas**. Está preparado para Netlify (gratis):
 
-```
-https://dbg-chollos.github.io/chollos-afiliados/liga/
-```
+- `scripts/preparar_web_liga.py` deja en `dist-liga/` lo justo para servirla
+  (sin README, sin pruebas, sin el SQL).
+- `netlify.toml` ya le dice a Netlify qué construir y qué publicar, así que al
+  conectar el repositorio no hay que escribir nada.
+- Sale una dirección tipo `loquesea.netlify.app`, que se puede renombrar.
 
-Cada uno abre esa dirección en su móvil → menú → *Añadir a pantalla de inicio*,
-y la tiene instalada con su icono, a pantalla completa y funcionando sin
-cobertura. Esa URL sirve **el programa**, no los datos: la liga de cada uno se
-guarda en su propio móvil. Lleva `noindex` y `Disallow` en robots.txt, así que
-no sale en Google, pero cualquiera que tenga la dirección puede abrir la app
-(vacía, sin ver nada vuestro).
+Una vez publicada, cada uno la abre en su móvil → menú → *Añadir a pantalla de
+inicio*, y la tiene instalada con su icono, a pantalla completa y funcionando
+sin cobertura.
+
+Esa URL sirve **el programa**, no los datos: quien la abra sin tener nada verá
+una app vacía. Va con `noindex` y con `robots.txt` cerrado, así que no aparece
+en ningún buscador.
 
 **Opción para trastear en local:**
 

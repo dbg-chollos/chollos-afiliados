@@ -592,27 +592,6 @@ cookies desde la configuracion de tu navegador.</p>
 }
 
 
-def copy_liga_app():
-    """Copia la app de la liga (carpeta liga/) dentro de docs/liga/.
-
-    build() borra y regenera docs/ entero en cada ejecucion, asi que la app hay
-    que volver a copiarla aqui: si se dejase a mano en docs/, el pipeline diario
-    se la llevaria por delante. La app no lleva ningun dato dentro — cada movil
-    guarda el suyo — asi que lo unico que se publica es el programa.
-    """
-    origen = os.path.join(os.path.dirname(__file__), "..", "liga")
-    if not os.path.isdir(origen):
-        return
-
-    destino = os.path.join(OUT_DIR, "liga")
-    shutil.copytree(
-        origen,
-        destino,
-        # Ni las pruebas ni el README hacen falta en el sitio publicado.
-        ignore=shutil.ignore_patterns("pruebas.js", "README.md", "la-liga.html"),
-    )
-
-
 def build(articles):
     if os.path.exists(OUT_DIR):
         shutil.rmtree(OUT_DIR)
@@ -674,15 +653,8 @@ def build(articles):
     with open(os.path.join(OUT_DIR, "sitemap.xml"), "w", encoding="utf-8") as f:
         f.write(sitemap)
 
-    # La app de la liga se publica en /liga/ pero no es parte del sitio de
-    # ofertas: fuera del sitemap y fuera de los buscadores.
-    copy_liga_app()
-
     with open(os.path.join(OUT_DIR, "robots.txt"), "w", encoding="utf-8") as f:
-        f.write(
-            f"User-agent: *\nAllow: /\nDisallow: /liga/\n"
-            f"Sitemap: {SITE_URL}/sitemap.xml\n"
-        )
+        f.write(f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}/sitemap.xml\n")
 
     with open(os.path.join(OUT_DIR, ".nojekyll"), "w", encoding="utf-8") as f:
         f.write("")

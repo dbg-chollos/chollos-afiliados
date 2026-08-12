@@ -1,0 +1,18 @@
+# Configuracion para publicar SOLO la app de la liga en un alojamiento propio.
+#
+# Con esto, al conectar el repositorio con Netlify no hay que escribir nada a
+# mano: coge esta configuracion sola. El sitio de ofertas (docs/) no se toca ni
+# se publica aqui — son dos webs distintas en dos dominios distintos.
+
+[build]
+  command = "python3 scripts/preparar_web_liga.py"
+  publish = "dist-liga"
+
+[build.environment]
+  PYTHON_VERSION = "3.11"
+
+# Que no la indexe ningun buscador aunque alguien comparta la direccion.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"

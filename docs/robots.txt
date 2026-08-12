@@ -1,4 +1,3 @@
 User-agent: *
 Allow: /
-Disallow: /liga/
 Sitemap: https://dbg-chollos.github.io/chollos-afiliados/sitemap.xml
