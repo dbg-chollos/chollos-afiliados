@@ -245,3 +245,17 @@ create policy fotos_borrar on storage.objects
 grant execute on function public.crear_liga(text, text, text, text, jsonb) to authenticated;
 grant execute on function public.unirse_a_liga(text, text, text) to authenticated;
 grant execute on function public.es_miembro(uuid) to authenticated;
+
+-- Permiso para que la API pueda tocar estas tablas. Se pone explicito y no se
+-- deja en manos de la opcion "Automatically expose new tables" del panel: asi
+-- el esquema funciona igual este activada o no.
+--
+-- Esto no abre nada: quien decide de verdad son las politicas de arriba. Sobre
+-- 'ligas', por ejemplo, no hay politica de insert ni de delete, asi que aunque
+-- aqui figure el permiso, la base de datos los rechaza igual. Y sin iniciar
+-- sesion (rol anon) no se concede absolutamente nada.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.ligas    to authenticated;
+grant select, insert, update, delete on public.miembros to authenticated;
+grant select, insert, update, delete on public.entradas to authenticated;
+grant select, insert, update, delete on public.votos    to authenticated;
