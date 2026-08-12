@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f0f13">
+<meta name="robots" content="noindex, nofollow">
+<title>La Liga</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icono.svg">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="cabecera">
+  <div class="cabecera-fila">
+    <h1 id="titulo-liga">La Liga</h1>
+    <button id="btn-yo" class="chip-yo" type="button">—</button>
+  </div>
+  <div id="barra-liga" class="barra-liga"></div>
+</header>
+
+<main id="principal">
+
+  <div id="aviso-temporal" class="aviso temporal" hidden></div>
+
+  <!-- ================= ALTA INICIAL ================= -->
+  <section id="vista-inicio" class="vista">
+    <div class="tarjeta centrada">
+      <h2>Bienvenido a la liga</h2>
+      <p class="apagado">
+        Antes de empezar, apunta a los que jugais. Podeis ser dos o los que querais.
+      </p>
+      <div class="campo">
+        <label for="inicio-nombre-liga">Nombre de la liga</label>
+        <input id="inicio-nombre-liga" type="text" placeholder="La Liga" autocomplete="off">
+      </div>
+      <div class="campo">
+        <label for="inicio-jugador">Jugadores</label>
+        <div class="fila-añadir">
+          <input id="inicio-jugador" type="text" placeholder="Nombre o mote" autocomplete="off">
+          <button id="inicio-añadir" class="btn btn-secundario" type="button">Añadir</button>
+        </div>
+      </div>
+      <ul id="inicio-lista" class="lista-jugadores"></ul>
+      <button id="inicio-empezar" class="btn btn-principal ancho" type="button" disabled>Empezar liga</button>
+    </div>
+  </section>
+
+  <!-- ================= REGISTRAR ================= -->
+  <section id="vista-registrar" class="vista">
+    <div class="tarjeta">
+      <div class="fila-cabecera">
+        <h2>Nueva entrada</h2>
+        <input id="reg-fecha" class="input-fecha" type="date">
+      </div>
+      <div id="reg-pasos" class="pasos"></div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="fila-cabecera">
+        <h2>Tus ultimas entradas</h2>
+        <span id="reg-contador" class="contador"></span>
+      </div>
+      <ul id="reg-historial" class="lista-entradas"></ul>
+    </div>
+  </section>
+
+  <!-- ================= CLASIFICACION ================= -->
+  <section id="vista-clasificacion" class="vista">
+    <nav class="tabs" id="tabs-clasificacion">
+      <button class="tab activo" data-tabla="general" type="button">General</button>
+      <button class="tab" data-tabla="puntos" type="button">Puntos</button>
+      <button class="tab" data-tabla="ritmo" type="button">Ritmo</button>
+      <button class="tab" data-tabla="nota" type="button">Nota</button>
+    </nav>
+    <div id="clasificacion-explicacion" class="aviso suave"></div>
+    <div id="clasificacion-tabla"></div>
+  </section>
+
+  <!-- ================= VOTAR ================= -->
+  <section id="vista-votar" class="vista">
+    <div class="aviso suave">
+      Puntua del 1 al 10 lo que suben los demas. Tus propias entradas no salen aqui:
+      nadie se vota a si mismo.
+    </div>
+    <div id="votar-pendientes"></div>
+    <div class="tarjeta">
+      <h2>Ya votadas</h2>
+      <div id="votar-hechas"></div>
+    </div>
+  </section>
+
+  <!-- ================= CAMPEONES ================= -->
+  <section id="vista-campeones" class="vista">
+    <nav class="tabs" id="tabs-campeones">
+      <button class="tab activo" data-periodo="dia" type="button">Dia</button>
+      <button class="tab" data-periodo="semana" type="button">Semana</button>
+      <button class="tab" data-periodo="mes" type="button">Mes</button>
+    </nav>
+    <div id="campeon-actual"></div>
+    <div class="tarjeta">
+      <h2>Historial</h2>
+      <div id="campeones-historial"></div>
+    </div>
+  </section>
+
+  <!-- ================= AJUSTES ================= -->
+  <section id="vista-ajustes" class="vista">
+    <div class="tarjeta">
+      <h2>Liga</h2>
+      <div class="campo">
+        <label for="aj-nombre-liga">Nombre</label>
+        <input id="aj-nombre-liga" type="text">
+      </div>
+      <div class="campo">
+        <label for="aj-limite">Mujeres para terminar la liga</label>
+        <input id="aj-limite" type="number" min="1" step="1">
+        <p class="ayuda">La liga acaba cuando <em>todos</em> llegan a esta cifra. Lo que
+        metas por encima se guarda y se ve, pero no puntua en esta liga.</p>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Jugadores</h2>
+      <ul id="aj-jugadores" class="lista-jugadores"></ul>
+      <div class="fila-añadir">
+        <input id="aj-nuevo-jugador" type="text" placeholder="Nombre o mote" autocomplete="off">
+        <button id="aj-añadir-jugador" class="btn btn-secundario" type="button">Añadir</button>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Puntos</h2>
+      <p class="ayuda">Cuanto vale cada resultado segun donde haya pasado.</p>
+      <table class="tabla-puntos">
+        <thead>
+          <tr><th>Resultado</th><th>En discoteca</th><th>Fuera</th></tr>
+        </thead>
+        <tbody id="aj-tabla-puntos"></tbody>
+      </table>
+      <label class="fila-check">
+        <input id="aj-dj" type="checkbox">
+        <span>Una sala con DJ cuenta como discoteca</span>
+      </label>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Fotos y valoraciones</h2>
+      <p class="ayuda">Como se le ensena la pava al resto para que le pongan nota.</p>
+      <div id="aj-modo-foto" class="opciones-lista"></div>
+      <button id="aj-borrar-fotos" class="btn btn-peligro ancho" type="button">
+        Borrar las fotos guardadas (los puntos y las notas se quedan)
+      </button>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Clasificacion general</h2>
+      <p class="ayuda">Peso de cada eje al mezclarlos. No hace falta que sumen 100.</p>
+      <div class="campo-linea"><label for="aj-peso-puntos">Puntos</label><input id="aj-peso-puntos" type="number" min="0" step="5"></div>
+      <div class="campo-linea"><label for="aj-peso-ritmo">Ritmo</label><input id="aj-peso-ritmo" type="number" min="0" step="5"></div>
+      <div class="campo-linea"><label for="aj-peso-nota">Nota</label><input id="aj-peso-nota" type="number" min="0" step="5"></div>
+      <div class="campo-linea"><label for="aj-votos-min">Votos minimos para que cuente una nota</label><input id="aj-votos-min" type="number" min="1" step="1"></div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Copias y datos</h2>
+      <p class="ayuda">
+        Todo esto vive solo en este dispositivo. Si borras los datos del navegador
+        o cambias de movil sin exportar, se pierde.
+      </p>
+      <div class="botonera">
+        <button id="aj-exportar" class="btn btn-secundario" type="button">Exportar (sin fotos)</button>
+        <button id="aj-exportar-fotos" class="btn btn-secundario" type="button">Exportar con fotos</button>
+      </div>
+      <div class="botonera">
+        <button id="aj-importar-fusion" class="btn btn-secundario" type="button">Importar y fusionar</button>
+        <button id="aj-importar-reemplazo" class="btn btn-secundario" type="button">Importar y reemplazar</button>
+      </div>
+      <input id="aj-archivo" type="file" accept="application/json" hidden>
+      <p id="aj-espacio" class="ayuda"></p>
+      <button id="aj-borrar" class="btn btn-peligro ancho" type="button">Borrar toda la liga</button>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Lo que conviene tener claro</h2>
+      <p class="ayuda">
+        Nada de esto sale de este dispositivo: ni entradas, ni fotos. Mientras
+        se quede entre vosotros y no se publique en ningun sitio, es uso
+        privado. Lo unico que hay que cuidar es que no se escape: no reenvieis
+        por ahi los archivos que exporteis con fotos, y si en algun momento
+        preferis no tener copias, arriba podeis borrarlas todas de golpe sin
+        perder puntos ni notas.
+      </p>
+    </div>
+  </section>
+</main>
+
+<nav class="navegacion" id="navegacion">
+  <button class="nav-btn activo" data-vista="registrar" type="button"><span>➕</span>Registrar</button>
+  <button class="nav-btn" data-vista="clasificacion" type="button"><span>🏆</span>Liga</button>
+  <button class="nav-btn" data-vista="votar" type="button"><span>⭐</span>Votar<i id="nav-badge" class="badge" hidden></i></button>
+  <button class="nav-btn" data-vista="campeones" type="button"><span>👑</span>Campeones</button>
+  <button class="nav-btn" data-vista="ajustes" type="button"><span>⚙️</span>Ajustes</button>
+</nav>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-caja">
+    <button id="modal-cerrar" class="modal-cerrar" type="button" aria-label="Cerrar">✕</button>
+    <div id="modal-contenido"></div>
+  </div>
+</div>
+
+<div id="aviso-flotante" class="aviso-flotante" hidden></div>
+
+<script src="js/reglas.js"></script>
+<script src="js/datos.js"></script>
+<script src="js/estadisticas.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

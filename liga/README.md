@@ -13,7 +13,21 @@ en el navegador del móvil que la usa**. Coste 0€, igual que el resto del repo
 **Opción rápida (probarla en el ordenador):** doble clic en `liga/index.html`.
 Funciona todo menos instalarla como app.
 
-**Opción buena (usarla en el móvil):**
+**Opción buena (cada uno en su móvil, sin depender de nadie):** una vez esta
+rama esté en `main`, la app queda publicada en
+
+```
+https://dbg-chollos.github.io/chollos-afiliados/liga/
+```
+
+Cada uno abre esa dirección en su móvil → menú → *Añadir a pantalla de inicio*,
+y la tiene instalada con su icono, a pantalla completa y funcionando sin
+cobertura. Esa URL sirve **el programa**, no los datos: la liga de cada uno se
+guarda en su propio móvil. Lleva `noindex` y `Disallow` en robots.txt, así que
+no sale en Google, pero cualquiera que tenga la dirección puede abrir la app
+(vacía, sin ver nada vuestro).
+
+**Opción para trastear en local:**
 
 ```bash
 python scripts/servir_liga.py

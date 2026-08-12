@@ -124,9 +124,14 @@ Arrancarla para usarla desde el movil (mismo wifi):
 python scripts/servir_liga.py
 ```
 
-**No se publica en GitHub Pages.** El sitio publico solo sirve la carpeta
-`docs/`, y `liga/` no esta ahi a proposito: los datos de la app (incluidas las
-fotos) se quedan en el navegador de cada uno y no se suben a ningun sitio.
+Se publica junto al sitio, en `/liga/`, para que cada uno pueda instalarla en su
+movil sin depender de ningun ordenador encendido. `build_site.py` la copia a
+`docs/liga/` en cada ejecucion (la funcion `copy_liga_app`), porque el pipeline
+borra y regenera `docs/` entero. Va con `noindex` y con `Disallow: /liga/` en
+robots.txt, y fuera del sitemap: no aparece en Google ni enlazada desde el sitio.
+
+**Lo que se publica es el programa, no los datos.** La app no lleva nada dentro:
+jugadores, entradas, fotos y votos se guardan en el navegador de cada movil.
 
 ## Que NO garantiza este sistema
 
