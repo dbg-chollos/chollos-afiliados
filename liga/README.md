@@ -17,10 +17,12 @@ Funciona todo menos instalarla como app.
 propio alojamiento, **con su propio dominio, sin ninguna relación con el sitio
 de ofertas**. Está preparado para Netlify (gratis):
 
-- `scripts/preparar_web_liga.py` deja en `dist-liga/` lo justo para servirla
-  (sin README, sin pruebas, sin el SQL).
-- `netlify.toml` ya le dice a Netlify qué construir y qué publicar, así que al
-  conectar el repositorio no hay que escribir nada.
+- `dist-liga/` es lo que se sirve: lo justo para que funcione (sin README, sin
+  pruebas, sin el SQL). Va ya construida en el repo, así que el despliegue no
+  puede fallar por ningún script. **Después de tocar la app hay que regenerarla**
+  con `python scripts/preparar_web_liga.py`.
+- `netlify.toml` ya le dice a Netlify qué publicar, así que al conectar el
+  repositorio no hay que escribir nada.
 - Sale una dirección tipo `loquesea.netlify.app`, que se puede renombrar.
 
 Una vez publicada, cada uno la abre en su móvil → menú → *Añadir a pantalla de
