@@ -15,6 +15,6 @@
  * nunca es la "secret key": esa se salta todas las reglas.
  */
 window.ConfigNube = {
-  URL: '',
+  URL: 'https://arfiuoxsqgcnkwtalcwn.supabase.co',
   CLAVE_PUBLICA: 'sb_publishable_8VbyboEPPyPtAPhtz4_aow_1lVnEfLg'
 };
