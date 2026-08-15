@@ -134,7 +134,13 @@ const servidor = http.createServer(async (req, res) => {
       }
       return json(res, 201, null);
     }
-    if (req.method === 'DELETE') return json(res, 204, null);
+    if (req.method === 'DELETE') {
+      const id = (url.searchParams.get('id') || '').replace('eq.', '');
+      const fila = entradas.get(id);
+      if (fila && fila.usuario !== yo) return json(res, 403, { message: 'No es tuya' });
+      entradas.delete(id);
+      return json(res, 204, null);
+    }
     const ligaId = (url.searchParams.get('liga_id') || '').replace('eq.', '');
     if (!esMiembro(ligaId)) return json(res, 200, []);
     return json(res, 200, [...entradas.values()].filter((e) => e.liga_id === ligaId));
@@ -162,7 +168,14 @@ const servidor = http.createServer(async (req, res) => {
   }
 
   if (ruta === '/rest/v1/ligas') {
-    if (req.method === 'PATCH') return json(res, 204, null);
+    if (req.method === 'PATCH') {
+      const id = (url.searchParams.get('id') || '').replace('eq.', '');
+      const liga = ligas.find((l) => l.id === id);
+      // Como la politica de verdad: solo quien la creo puede tocarla.
+      if (!liga || liga.creada_por !== yo) return json(res, 204, null);
+      Object.assign(liga, cuerpo);
+      return json(res, 204, null);
+    }
     return json(res, 200, ligas.filter((l) => esMiembro(l.id)));
   }
 

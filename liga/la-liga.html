@@ -567,6 +567,10 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
     <div class="tarjeta">
       <h2>Puntos</h2>
       <p class="ayuda">Cuanto vale cada resultado segun donde haya pasado.</p>
+      <p id="aj-reglas-bloqueadas" class="aviso suave" hidden>
+        Las reglas las pone quien creo la liga, y son las mismas para todos. Si
+        cada uno pudiera cambiarlas, el mismo lio valdria distinto en cada movil.
+      </p>
       <table class="tabla-puntos">
         <thead>
           <tr><th>Resultado</th><th>En discoteca</th><th>Fuera</th></tr>
@@ -2053,6 +2057,32 @@ window.ConfigNube = {
     });
   }
 
+  /**
+   * Las reglas son de la liga, no del movil. Si cada uno tuviera las suyas,
+   * el mismo lio valdria distinto en cada telefono y cada uno veria una
+   * clasificacion diferente sin entender por que. Manda la liga: las escribe
+   * quien la creo y las demas se las bajan.
+   */
+  function fusionaReglas(estado, liga) {
+    if (!liga) return;
+    estado.liga.creadaPor = liga.creada_por;
+    var reglas = liga.reglas;
+    if (!reglas || typeof reglas !== 'object' || !Object.keys(reglas).length) return;
+
+    var base = D.normaliza({
+      jugadores: [], entradas: [], votos: {}, reglas: reglas
+    }).reglas;
+    // El modo de foto sigue siendo cosa de cada uno: es sobre su propio movil.
+    base.modoFoto = estado.reglas.modoFoto;
+    base.modoFotoElegido = estado.reglas.modoFotoElegido;
+    estado.reglas = base;
+  }
+
+  /** ¿Es quien creo la liga? Solo esa persona puede cambiar las reglas. */
+  function soyElJefe(estado) {
+    return !!(estado.liga && estado.liga.creadaPor && estado.liga.creadaPor === miId());
+  }
+
   function misEntradas(estado) {
     var yo = miId();
     return estado.entradas.filter(function (e) { return e.jugadorId === yo; });
@@ -2129,6 +2159,8 @@ window.ConfigNube = {
         return N.guardarFilas('entradas', mias);
       })
       .then(function () { return N.guardarFilas('votos', misVotos(estado)); })
+      .then(function () { return N.miLiga(); })
+      .then(function (liga) { fusionaReglas(estado, liga); })
       .then(function () { return N.miembros(ligaId); })
       .then(function (filas) { fusionaMiembros(estado, filas || []); })
       .then(function () { return N.entradas(ligaId); })
@@ -2145,9 +2177,17 @@ window.ConfigNube = {
       });
   }
 
+  /** Sube las reglas a la liga. Solo cuela si eres quien la creo. */
+  function publicarReglas(estado) {
+    if (!enNube() || !soyElJefe(estado)) return Promise.resolve();
+    return N.guardarReglas(N.vinculo().id, estado.reglas);
+  }
+
   var api = {
     enNube: enNube,
     miId: miId,
+    soyElJefe: soyElJefe,
+    publicarReglas: publicarReglas,
     adoptarLiga: adoptarLiga,
     sincronizar: sincronizar,
     aServidor: aServidor,
@@ -2691,11 +2731,25 @@ window.ConfigNube = {
   }
 
   function borrarEntrada(id) {
+    // Primero en el servidor: si se borra solo aqui, la siguiente
+    // sincronizacion se la vuelve a bajar y parece que la app no obedece.
+    var enServidor = enNube()
+      ? window.Nube.borrarEntrada(id)
+      : Promise.resolve();
+
+    enServidor.then(function () {
+      quitarEntradaDeAqui(id);
+      aviso('Entrada borrada');
+    }).catch(function (err) {
+      aviso('No se ha podido borrar del servidor: ' + err.message);
+    });
+  }
+
+  function quitarEntradaDeAqui(id) {
     estado.entradas = estado.entradas.filter(function (e) { return e.id !== id; });
     delete estado.votos[id];
     D.borrarFoto(id);
     persistir();
-    aviso('Entrada borrada');
     pintar();
   }
 
@@ -2948,6 +3002,16 @@ window.ConfigNube = {
 
   function enNube() { return S && S.enNube(); }
 
+  /** ¿Puede esta persona cambiar las reglas de la liga? */
+  function mandoSobreReglas() { return !enNube() || S.soyElJefe(estado); }
+
+  function publicarReglas() {
+    if (!enNube()) return;
+    S.publicarReglas(estado).catch(function (err) {
+      aviso('Las reglas no han subido: ' + err.message);
+    });
+  }
+
   function pintarNube() {
     var caja = $('#aj-nube');
     if (!N || !N.configurada()) { caja.hidden = true; return; }
@@ -3186,6 +3250,17 @@ window.ConfigNube = {
         '<td class="num"><input type="number" step="0.5" data-punto="' + res.id + '" data-donde="fuera" value="' + p.fuera + '"></td></tr>';
     }).join('');
 
+    // Las reglas son de la liga: quien no la creo las ve, pero no las toca.
+    // Si cada uno pudiera cambiarlas, el mismo lio valdria distinto en cada
+    // movil y las clasificaciones no cuadrarian.
+    var mando = mandoSobreReglas();
+    $$('#aj-tabla-puntos input, #aj-limite, #aj-dj, #aj-peso-puntos, #aj-peso-ritmo, ' +
+      '#aj-peso-nota, #aj-votos-min').forEach(function (campo) {
+      campo.disabled = !mando;
+    });
+    var nota = $('#aj-reglas-bloqueadas');
+    if (nota) nota.hidden = mando;
+
     // En modo compartido los jugadores son quienes entran con su cuenta, no
     // una lista que se escribe a mano.
     var enComun = enNube();
@@ -3250,6 +3325,7 @@ window.ConfigNube = {
         if (isNaN(valor)) return;
         estado.reglas.puntos[input.dataset.punto][input.dataset.donde] = valor;
         persistir();
+        publicarReglas();
         aviso('Puntuacion actualizada');
       });
     });
@@ -3267,6 +3343,7 @@ window.ConfigNube = {
       estado.reglas.limiteLiga = v;
       this.value = v;
       persistir();
+      publicarReglas();
       pintarCabecera();
       aviso('Liga a ' + v + ' mujeres');
     });
@@ -3274,6 +3351,7 @@ window.ConfigNube = {
     $('#aj-dj').addEventListener('change', function () {
       estado.reglas.djCuentaComoDiscoteca = this.checked;
       persistir();
+      publicarReglas();
       aviso(this.checked ? 'El DJ cuenta como discoteca' : 'El DJ ya no cuenta como discoteca');
     });
 
@@ -3281,6 +3359,7 @@ window.ConfigNube = {
       $(par[0]).addEventListener('change', function () {
         estado.reglas.pesos[par[1]] = Math.max(0, Number(this.value) || 0);
         persistir();
+        publicarReglas();
       });
     });
 
@@ -3288,6 +3367,7 @@ window.ConfigNube = {
       estado.reglas.votosMinimos = Math.max(1, Math.round(Number(this.value) || 1));
       this.value = estado.reglas.votosMinimos;
       persistir();
+      publicarReglas();
     });
 
     $('#aj-añadir-jugador').addEventListener('click', añadirJugador);

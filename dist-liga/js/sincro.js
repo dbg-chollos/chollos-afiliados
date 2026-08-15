@@ -129,6 +129,32 @@
     });
   }
 
+  /**
+   * Las reglas son de la liga, no del movil. Si cada uno tuviera las suyas,
+   * el mismo lio valdria distinto en cada telefono y cada uno veria una
+   * clasificacion diferente sin entender por que. Manda la liga: las escribe
+   * quien la creo y las demas se las bajan.
+   */
+  function fusionaReglas(estado, liga) {
+    if (!liga) return;
+    estado.liga.creadaPor = liga.creada_por;
+    var reglas = liga.reglas;
+    if (!reglas || typeof reglas !== 'object' || !Object.keys(reglas).length) return;
+
+    var base = D.normaliza({
+      jugadores: [], entradas: [], votos: {}, reglas: reglas
+    }).reglas;
+    // El modo de foto sigue siendo cosa de cada uno: es sobre su propio movil.
+    base.modoFoto = estado.reglas.modoFoto;
+    base.modoFotoElegido = estado.reglas.modoFotoElegido;
+    estado.reglas = base;
+  }
+
+  /** ¿Es quien creo la liga? Solo esa persona puede cambiar las reglas. */
+  function soyElJefe(estado) {
+    return !!(estado.liga && estado.liga.creadaPor && estado.liga.creadaPor === miId());
+  }
+
   function misEntradas(estado) {
     var yo = miId();
     return estado.entradas.filter(function (e) { return e.jugadorId === yo; });
@@ -205,6 +231,8 @@
         return N.guardarFilas('entradas', mias);
       })
       .then(function () { return N.guardarFilas('votos', misVotos(estado)); })
+      .then(function () { return N.miLiga(); })
+      .then(function (liga) { fusionaReglas(estado, liga); })
       .then(function () { return N.miembros(ligaId); })
       .then(function (filas) { fusionaMiembros(estado, filas || []); })
       .then(function () { return N.entradas(ligaId); })
@@ -221,9 +249,17 @@
       });
   }
 
+  /** Sube las reglas a la liga. Solo cuela si eres quien la creo. */
+  function publicarReglas(estado) {
+    if (!enNube() || !soyElJefe(estado)) return Promise.resolve();
+    return N.guardarReglas(N.vinculo().id, estado.reglas);
+  }
+
   var api = {
     enNube: enNube,
     miId: miId,
+    soyElJefe: soyElJefe,
+    publicarReglas: publicarReglas,
     adoptarLiga: adoptarLiga,
     sincronizar: sincronizar,
     aServidor: aServidor,

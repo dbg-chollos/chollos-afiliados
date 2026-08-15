@@ -530,11 +530,25 @@
   }
 
   function borrarEntrada(id) {
+    // Primero en el servidor: si se borra solo aqui, la siguiente
+    // sincronizacion se la vuelve a bajar y parece que la app no obedece.
+    var enServidor = enNube()
+      ? window.Nube.borrarEntrada(id)
+      : Promise.resolve();
+
+    enServidor.then(function () {
+      quitarEntradaDeAqui(id);
+      aviso('Entrada borrada');
+    }).catch(function (err) {
+      aviso('No se ha podido borrar del servidor: ' + err.message);
+    });
+  }
+
+  function quitarEntradaDeAqui(id) {
     estado.entradas = estado.entradas.filter(function (e) { return e.id !== id; });
     delete estado.votos[id];
     D.borrarFoto(id);
     persistir();
-    aviso('Entrada borrada');
     pintar();
   }
 
@@ -787,6 +801,16 @@
 
   function enNube() { return S && S.enNube(); }
 
+  /** ¿Puede esta persona cambiar las reglas de la liga? */
+  function mandoSobreReglas() { return !enNube() || S.soyElJefe(estado); }
+
+  function publicarReglas() {
+    if (!enNube()) return;
+    S.publicarReglas(estado).catch(function (err) {
+      aviso('Las reglas no han subido: ' + err.message);
+    });
+  }
+
   function pintarNube() {
     var caja = $('#aj-nube');
     if (!N || !N.configurada()) { caja.hidden = true; return; }
@@ -1025,6 +1049,17 @@
         '<td class="num"><input type="number" step="0.5" data-punto="' + res.id + '" data-donde="fuera" value="' + p.fuera + '"></td></tr>';
     }).join('');
 
+    // Las reglas son de la liga: quien no la creo las ve, pero no las toca.
+    // Si cada uno pudiera cambiarlas, el mismo lio valdria distinto en cada
+    // movil y las clasificaciones no cuadrarian.
+    var mando = mandoSobreReglas();
+    $$('#aj-tabla-puntos input, #aj-limite, #aj-dj, #aj-peso-puntos, #aj-peso-ritmo, ' +
+      '#aj-peso-nota, #aj-votos-min').forEach(function (campo) {
+      campo.disabled = !mando;
+    });
+    var nota = $('#aj-reglas-bloqueadas');
+    if (nota) nota.hidden = mando;
+
     // En modo compartido los jugadores son quienes entran con su cuenta, no
     // una lista que se escribe a mano.
     var enComun = enNube();
@@ -1089,6 +1124,7 @@
         if (isNaN(valor)) return;
         estado.reglas.puntos[input.dataset.punto][input.dataset.donde] = valor;
         persistir();
+        publicarReglas();
         aviso('Puntuacion actualizada');
       });
     });
@@ -1106,6 +1142,7 @@
       estado.reglas.limiteLiga = v;
       this.value = v;
       persistir();
+      publicarReglas();
       pintarCabecera();
       aviso('Liga a ' + v + ' mujeres');
     });
@@ -1113,6 +1150,7 @@
     $('#aj-dj').addEventListener('change', function () {
       estado.reglas.djCuentaComoDiscoteca = this.checked;
       persistir();
+      publicarReglas();
       aviso(this.checked ? 'El DJ cuenta como discoteca' : 'El DJ ya no cuenta como discoteca');
     });
 
@@ -1120,6 +1158,7 @@
       $(par[0]).addEventListener('change', function () {
         estado.reglas.pesos[par[1]] = Math.max(0, Number(this.value) || 0);
         persistir();
+        publicarReglas();
       });
     });
 
@@ -1127,6 +1166,7 @@
       estado.reglas.votosMinimos = Math.max(1, Math.round(Number(this.value) || 1));
       this.value = estado.reglas.votosMinimos;
       persistir();
+      publicarReglas();
     });
 
     $('#aj-añadir-jugador').addEventListener('click', añadirJugador);
