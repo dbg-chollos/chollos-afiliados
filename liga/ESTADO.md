@@ -21,8 +21,8 @@ memoria (o para que otra sesión lo continúe). Actualizar al terminar cada paso
 - **Base de datos en Supabase**: creada y verificada por él con el esquema de
   `liga/supabase/esquema.sql` → 4 tablas, 12 políticas, bucket de fotos y sus
   3 políticas. Proyecto `arfiuoxsqgcnkwtalcwn`.
-- **Capa de conexión** (`liga/js/nube.js`): auth por código de 6 dígitos,
-  crear/unirse a liga, subir y bajar fotos, renovación de sesión. **Escrita
+- **Capa de conexión** (`liga/js/nube.js`): registro y entrada con correo y
+  contraseña, crear/unirse a liga, subir y bajar fotos, renovación de sesión. **Escrita
   pero sin probar contra el servidor.**
 
 ## Lo siguiente
@@ -36,16 +36,17 @@ memoria (o para que otra sesión lo continúe). Actualizar al terminar cada paso
    código, y estado de sincronización. Aún no existen.
 4. **Sincronizar** el estado local con el servidor (subir lo que falte, bajar
    lo de los demás, fusionar por id como ya hace `Datos.importar`).
-5. **Plantilla del correo** en Supabase: hay que añadir `{{ .Token }}` para que
-   llegue el código de 6 dígitos, porque la plantilla por defecto solo trae el
-   enlace mágico. Sin eso, no se puede entrar.
+5. **Desactivar "Confirm email"** en Supabase (Authentication → Sign In /
+   Providers → Email). Sin eso nadie puede entrar tras registrarse.
 6. Conectar Netlify a la rama y renombrar el sitio.
 
 ## Cosas que no hay que deshacer sin pensarlo
 
 - **Nada de la app en `docs/`.** Es lo que más le importa de todo esto.
-- **Código de 6 dígitos, no enlace mágico**: un enlace abre el navegador en vez
-  de la app instalada y la sesión se queda en el sitio equivocado.
+- **Correo y contraseña, sin correos de por medio.** El plan gratuito manda muy
+  pocos correos por hora: con código por email, si cuatro amigos se registran la
+  misma noche, los últimos se quedan esperando. Un enlace mágico, además, abre
+  el navegador en vez de la app instalada.
 - La clave publicable va dentro de la app a propósito; la `service_role` no
   aparece en ningún sitio y no debe pedírsele.
 - El código de liga se genera sin vocales ni caracteres confundibles: se dicta
