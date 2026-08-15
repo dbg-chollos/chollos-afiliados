@@ -1578,8 +1578,20 @@ window.ConfigNube = {
   }
 
   function guardarSesion(datos) {
+    if (datos && !datos.caduca_en) {
+      // Supabase da los segundos que dura; guardamos el momento exacto para
+      // poder renovar antes de que caduque en vez de esperar a que falle.
+      var segundos = Number(datos.expires_in) > 0 ? Number(datos.expires_in) : 3600;
+      datos.caduca_en = Date.now() + segundos * 1000;
+    }
     sesion = datos;
     escribirGuardado(CLAVE_SESION, datos);
+  }
+
+  /** ¿Le queda menos de un minuto al token? */
+  function caducando() {
+    var s = cargarSesion();
+    return !!(s && s.caduca_en && Date.now() > s.caduca_en - 60000);
   }
 
   function usuario() {
@@ -1645,12 +1657,23 @@ window.ConfigNube = {
    * Los tokens duran una hora; sin esto habria que volver a entrar cada rato.
    */
   function pedirConSesion(camino, opciones) {
-    return pedir(camino, opciones).catch(function (err) {
-      if (err.status !== 401 || !cargarSesion()) throw err;
-      return renovar().then(function () { return pedir(camino, opciones); });
-    });
+    var previo = caducando() ? renovar().catch(function () { /* se reintenta abajo */ })
+      : Promise.resolve();
+
+    return previo
+      .then(function () { return pedir(camino, opciones); })
+      .catch(function (err) {
+        if (err.status !== 401 || !cargarSesion()) throw err;
+        return renovar().then(function () { return pedir(camino, opciones); });
+      });
   }
 
+  /**
+   * Renovar el token. Solo se cierra la sesion si el servidor dice
+   * expresamente que ya no vale: un fallo de red no puede echar a nadie.
+   * Sin esto, quedarse sin cobertura en mitad de la noche te dejaba fuera y
+   * habia que volver a escribir correo y contrasena para seguir apuntando.
+   */
   function renovar() {
     var s = cargarSesion();
     if (!s || !s.refresh_token) return Promise.reject(new Error('No hay sesion'));
@@ -1662,8 +1685,8 @@ window.ConfigNube = {
       guardarSesion(datos);
       return datos;
     }).catch(function (err) {
-      // Si ni renovando entra, la sesion esta muerta: mejor pedir el correo otra vez.
-      guardarSesion(null);
+      var rechazadaPorElServidor = err.status === 400 || err.status === 401 || err.status === 403;
+      if (rechazadaPorElServidor) guardarSesion(null);
       throw err;
     });
   }

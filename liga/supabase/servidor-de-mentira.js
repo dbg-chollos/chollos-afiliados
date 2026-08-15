@@ -8,6 +8,7 @@ const http = require('http');
 
 const usuarios = new Map();   // email -> {id, email, password}
 const sesiones = new Map();   // token -> userId
+const refrescos = new Map();  // refresh_token -> userId
 const ligas = [];             // {id, nombre, codigo, reglas, creada_por}
 const miembros = [];          // {liga_id, usuario, nombre, color, unido}
 const entradas = new Map();   // id -> fila
@@ -39,8 +40,15 @@ function usuarioDe(req) {
 
 function sesionPara(u) {
   const token = 'tok_' + Math.random().toString(36).slice(2);
+  const refresco = 'ref_' + Math.random().toString(36).slice(2);
   sesiones.set(token, u.id);
-  return { access_token: token, refresh_token: 'ref_' + token, user: { id: u.id, email: u.email } };
+  refrescos.set(refresco, u.id);
+  return {
+    access_token: token,
+    refresh_token: refresco,
+    expires_in: 3600,
+    user: { id: u.id, email: u.email }
+  };
 }
 
 const servidor = http.createServer(async (req, res) => {
@@ -69,7 +77,11 @@ const servidor = http.createServer(async (req, res) => {
 
   if (ruta === '/auth/v1/token') {
     if (url.searchParams.get('grant_type') === 'refresh_token') {
-      return json(res, 200, { access_token: 'tok_renovado', refresh_token: 'ref', user: {} });
+      const id = refrescos.get(cuerpo.refresh_token);
+      if (!id) return json(res, 400, { message: 'Invalid Refresh Token' });
+      refrescos.delete(cuerpo.refresh_token); // de un solo uso, como el de verdad
+      const u = [...usuarios.values()].find((x) => x.id === id);
+      return json(res, 200, sesionPara(u));
     }
     const u = usuarios.get(cuerpo.email);
     if (!u || u.password !== cuerpo.password) {
