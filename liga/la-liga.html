@@ -151,6 +151,23 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
 .opcion-lista input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--acento); flex: 0 0 auto; }
 .opcion-lista .ayuda { margin: 3px 0 0; }
 
+.codigo-liga {
+  background: var(--fondo-2);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  margin: 12px 0;
+}
+.codigo-liga .etiqueta { display: block; font-size: .74rem; color: var(--apagado); margin-bottom: 6px; }
+.codigo-liga strong {
+  display: block; font-size: 1.5rem; letter-spacing: 2px;
+  color: var(--acento-2); font-variant-numeric: tabular-nums; margin-bottom: 10px;
+}
+.codigo-liga .btn { width: 100%; }
+
+.estado-nube { color: #6fd3a5; }
+
 .zona-foto input[type=text] { margin-bottom: 4px; }
 .enlace-perfil { text-decoration: none; text-align: center; margin: 0 0 10px; }
 
@@ -531,6 +548,11 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
         <p class="ayuda">La liga acaba cuando <em>todos</em> llegan a esta cifra. Lo que
         metas por encima se guarda y se ve, pero no puntua en esta liga.</p>
       </div>
+    </div>
+
+    <div class="tarjeta" id="aj-nube" hidden>
+      <h2>Liga en comun</h2>
+      <div id="nube-contenido"></div>
     </div>
 
     <div class="tarjeta">
@@ -1490,6 +1512,631 @@ window.ConfigNube = {
 </script>
 <script>
 /*
+ * nube.js — hablar con Supabase.
+ *
+ * Todo va por fetch contra la API de Supabase, sin librerias: la app no carga
+ * nada de internet y sigue funcionando de un archivo suelto.
+ *
+ * Dos ideas que conviene tener claras al leer esto:
+ *
+ * 1. La app sigue siendo local. Se apunta en el movil y se guarda ahi; la nube
+ *    es una copia comun que se sincroniza cuando hay internet. Si estas en el
+ *    garito sin cobertura, apuntas igual y sube luego.
+ *
+ * 2. Se entra con correo y contrasena, sin nada por correo electronico. Las dos
+ *    alternativas se descartaron por lo mismo: el plan gratuito de Supabase
+ *    manda muy pocos correos por hora, asi que si cuatro amigos se registran la
+ *    misma noche, los ultimos se quedan esperando un correo que no llega. Y un
+ *    enlace magico, ademas, abriria el navegador en vez de la app instalada.
+ *
+ *    Para que esto funcione hay que desactivar "Confirm email" en el panel
+ *    (Authentication -> Sign In / Providers -> Email).
+ */
+(function (global) {
+  'use strict';
+
+  var CLAVE_SESION = 'liga.sesion.v1';
+  var CLAVE_VINCULO = 'liga.nube.v1';
+
+  function config() {
+    return global.ConfigNube || { URL: '', CLAVE_PUBLICA: '' };
+  }
+
+  /** ¿Hay servidor configurado? Si no, la app va en modo local y ya esta. */
+  function configurada() {
+    var c = config();
+    return !!(c.URL && c.CLAVE_PUBLICA);
+  }
+
+  function url(camino) {
+    return config().URL.replace(/\/+$/, '') + camino;
+  }
+
+  // --- Sesion ---------------------------------------------------------------
+
+  var sesion = null;
+
+  function leerGuardado(clave) {
+    try {
+      var crudo = localStorage.getItem(clave);
+      return crudo ? JSON.parse(crudo) : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function escribirGuardado(clave, valor) {
+    try {
+      if (valor === null) localStorage.removeItem(clave);
+      else localStorage.setItem(clave, JSON.stringify(valor));
+    } catch (err) { /* sin almacenamiento: la sesion dura lo que la pestana */ }
+  }
+
+  function cargarSesion() {
+    if (!sesion) sesion = leerGuardado(CLAVE_SESION);
+    return sesion;
+  }
+
+  function guardarSesion(datos) {
+    sesion = datos;
+    escribirGuardado(CLAVE_SESION, datos);
+  }
+
+  function usuario() {
+    var s = cargarSesion();
+    return s && s.user ? s.user : null;
+  }
+
+  function conectado() {
+    return !!cargarSesion();
+  }
+
+  /** El vinculo con una liga concreta: su id, su codigo y su nombre. */
+  function vinculo() {
+    return leerGuardado(CLAVE_VINCULO);
+  }
+
+  function guardarVinculo(datos) {
+    escribirGuardado(CLAVE_VINCULO, datos);
+  }
+
+  // --- Peticiones -----------------------------------------------------------
+
+  function cabeceras(conSesion) {
+    var h = {
+      apikey: config().CLAVE_PUBLICA,
+      'Content-Type': 'application/json'
+    };
+    var s = conSesion !== false && cargarSesion();
+    if (s && s.access_token) h.Authorization = 'Bearer ' + s.access_token;
+    return h;
+  }
+
+  function mensajeDeError(cuerpo, respuesta) {
+    if (cuerpo && typeof cuerpo === 'object') {
+      var texto = cuerpo.message || cuerpo.error_description || cuerpo.msg ||
+        cuerpo.error || cuerpo.hint;
+      if (texto) return texto;
+    }
+    return 'Error ' + respuesta.status;
+  }
+
+  function pedir(camino, opciones) {
+    opciones = opciones || {};
+    return fetch(url(camino), {
+      method: opciones.method || 'GET',
+      headers: Object.assign(cabeceras(opciones.conSesion), opciones.headers || {}),
+      body: opciones.body === undefined ? undefined : JSON.stringify(opciones.body)
+    }).then(function (respuesta) {
+      var vacia = respuesta.status === 204 || respuesta.status === 205;
+      return (vacia ? Promise.resolve(null) : respuesta.text().then(function (t) {
+        try { return t ? JSON.parse(t) : null; } catch (err) { return t; }
+      })).then(function (cuerpo) {
+        if (respuesta.ok) return cuerpo;
+        var error = new Error(mensajeDeError(cuerpo, respuesta));
+        error.status = respuesta.status;
+        throw error;
+      });
+    });
+  }
+
+  /**
+   * Como pedir(), pero si la sesion ha caducado la renueva y reintenta una vez.
+   * Los tokens duran una hora; sin esto habria que volver a entrar cada rato.
+   */
+  function pedirConSesion(camino, opciones) {
+    return pedir(camino, opciones).catch(function (err) {
+      if (err.status !== 401 || !cargarSesion()) throw err;
+      return renovar().then(function () { return pedir(camino, opciones); });
+    });
+  }
+
+  function renovar() {
+    var s = cargarSesion();
+    if (!s || !s.refresh_token) return Promise.reject(new Error('No hay sesion'));
+    return pedir('/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      conSesion: false,
+      body: { refresh_token: s.refresh_token }
+    }).then(function (datos) {
+      guardarSesion(datos);
+      return datos;
+    }).catch(function (err) {
+      // Si ni renovando entra, la sesion esta muerta: mejor pedir el correo otra vez.
+      guardarSesion(null);
+      throw err;
+    });
+  }
+
+  // --- Entrar y salir -------------------------------------------------------
+
+  function limpiaCorreo(email) {
+    return String(email || '').trim().toLowerCase();
+  }
+
+  /**
+   * Traduce los mensajes de Supabase, que vienen en ingles y de tecnico.
+   * Alguien que se registra a las cuatro de la manana no merece leer
+   * "Invalid login credentials".
+   */
+  function enCristiano(err) {
+    var texto = (err && err.message ? err.message : '').toLowerCase();
+    if (texto.indexOf('invalid login credentials') !== -1) {
+      return new Error('El correo o la contrasena no son correctos');
+    }
+    if (texto.indexOf('already registered') !== -1 || texto.indexOf('already exists') !== -1) {
+      return new Error('Ese correo ya tiene cuenta: entra en vez de registrarte');
+    }
+    if (texto.indexOf('password should be') !== -1 || texto.indexOf('at least') !== -1) {
+      return new Error('La contrasena tiene que tener 6 caracteres o mas');
+    }
+    if (texto.indexOf('email not confirmed') !== -1) {
+      return new Error('Falta desactivar "Confirm email" en el panel de Supabase');
+    }
+    if (texto.indexOf('failed to fetch') !== -1 || texto.indexOf('networkerror') !== -1) {
+      return new Error('Sin conexion. Se guarda en el movil y sube cuando vuelvas a tener internet');
+    }
+    return err;
+  }
+
+  function guardarYDevolver(datos) {
+    if (!datos || !datos.access_token) {
+      throw new Error('El servidor no ha devuelto una sesion');
+    }
+    guardarSesion(datos);
+    return datos;
+  }
+
+  /** Crear cuenta. Sin "Confirm email" activo, entra directamente. */
+  function registrarse(email, contrasena) {
+    return pedir('/auth/v1/signup', {
+      method: 'POST',
+      conSesion: false,
+      body: { email: limpiaCorreo(email), password: String(contrasena) }
+    }).then(guardarYDevolver).catch(function (err) { throw enCristiano(err); });
+  }
+
+  function entrar(email, contrasena) {
+    return pedir('/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      conSesion: false,
+      body: { email: limpiaCorreo(email), password: String(contrasena) }
+    }).then(guardarYDevolver).catch(function (err) { throw enCristiano(err); });
+  }
+
+  function salir() {
+    var s = cargarSesion();
+    guardarSesion(null);
+    guardarVinculo(null);
+    if (!s) return Promise.resolve();
+    return pedir('/auth/v1/logout', { method: 'POST' }).catch(function () { /* da igual */ });
+  }
+
+  // --- Ligas ----------------------------------------------------------------
+
+  function codigoNuevo() {
+    // Sin vocales ni caracteres que se confundan (0/O, 1/I): se dicta en voz alta.
+    var letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    var codigo = '';
+    for (var i = 0; i < 5; i++) {
+      codigo += letras[Math.floor(Math.random() * letras.length)];
+    }
+    return 'LIGA-' + codigo;
+  }
+
+  function crearLiga(nombre, jugador, color, reglas) {
+    var codigo = codigoNuevo();
+    return pedirConSesion('/rest/v1/rpc/crear_liga', {
+      method: 'POST',
+      body: {
+        p_nombre: nombre,
+        p_codigo: codigo,
+        p_jugador: jugador,
+        p_color: color || '#e5484d',
+        p_reglas: reglas || {}
+      }
+    }).then(function (liga) {
+      guardarVinculo({ id: liga.id, codigo: liga.codigo, nombre: liga.nombre });
+      return liga;
+    });
+  }
+
+  function unirse(codigo, jugador, color) {
+    return pedirConSesion('/rest/v1/rpc/unirse_a_liga', {
+      method: 'POST',
+      body: { p_codigo: codigo, p_jugador: jugador, p_color: color || '#3e63dd' }
+    }).then(function (liga) {
+      guardarVinculo({ id: liga.id, codigo: liga.codigo, nombre: liga.nombre });
+      return liga;
+    });
+  }
+
+  // --- Fotos ----------------------------------------------------------------
+
+  function dataUrlABlob(dataUrl) {
+    var partes = dataUrl.split(',');
+    var tipo = (partes[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+    var binario = atob(partes[1]);
+    var bytes = new Uint8Array(binario.length);
+    for (var i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+    return new Blob([bytes], { type: tipo });
+  }
+
+  function subirFoto(ligaId, entradaId, dataUrl) {
+    var ruta = ligaId + '/' + entradaId + '.jpg';
+    var s = cargarSesion();
+    return fetch(url('/storage/v1/object/' + ruta.replace(/^/, 'fotos/')), {
+      method: 'POST',
+      headers: {
+        apikey: config().CLAVE_PUBLICA,
+        Authorization: 'Bearer ' + (s ? s.access_token : ''),
+        'Content-Type': 'image/jpeg',
+        'x-upsert': 'true'
+      },
+      body: dataUrlABlob(dataUrl)
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (t) { throw new Error('No se pudo subir la foto: ' + t); });
+      return ruta;
+    });
+  }
+
+  function descargarFoto(ruta) {
+    var s = cargarSesion();
+    return fetch(url('/storage/v1/object/authenticated/fotos/' + ruta), {
+      headers: {
+        apikey: config().CLAVE_PUBLICA,
+        Authorization: 'Bearer ' + (s ? s.access_token : '')
+      }
+    }).then(function (r) {
+      if (!r.ok) throw new Error('No se pudo bajar la foto');
+      return r.blob();
+    }).then(function (blob) {
+      return new Promise(function (resolve, reject) {
+        var lector = new FileReader();
+        lector.onload = function () { resolve(lector.result); };
+        lector.onerror = function () { reject(new Error('Foto ilegible')); };
+        lector.readAsDataURL(blob);
+      });
+    });
+  }
+
+  // --- Leer y escribir la liga ---------------------------------------------
+
+  function miembros(ligaId) {
+    return pedirConSesion('/rest/v1/miembros?select=*&liga_id=eq.' + encodeURIComponent(ligaId));
+  }
+
+  function entradas(ligaId) {
+    return pedirConSesion('/rest/v1/entradas?select=*&liga_id=eq.' +
+      encodeURIComponent(ligaId) + '&order=fecha.asc');
+  }
+
+  /**
+   * Los votos no llevan liga_id: cuelgan de la entrada. PostgREST permite
+   * filtrar por la tabla relacionada con !inner, que es justo lo que hace falta.
+   */
+  function votos(ligaId) {
+    return pedirConSesion('/rest/v1/votos?select=entrada_id,usuario,nota,entradas!inner(liga_id)' +
+      '&entradas.liga_id=eq.' + encodeURIComponent(ligaId));
+  }
+
+  /** Upsert: repetir el envio de algo ya subido no duplica ni falla. */
+  function guardarFilas(tabla, filas) {
+    if (!filas.length) return Promise.resolve([]);
+    return pedirConSesion('/rest/v1/' + tabla, {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: filas
+    });
+  }
+
+  function borrarEntrada(id) {
+    return pedirConSesion('/rest/v1/entradas?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' }
+    });
+  }
+
+  function guardarReglas(ligaId, reglas) {
+    return pedirConSesion('/rest/v1/ligas?id=eq.' + encodeURIComponent(ligaId), {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: { reglas: reglas }
+    });
+  }
+
+  function miLiga() {
+    return pedirConSesion('/rest/v1/ligas?select=*').then(function (filas) {
+      return filas && filas.length ? filas[0] : null;
+    });
+  }
+
+  var api = {
+    configurada: configurada,
+    conectado: conectado,
+    usuario: usuario,
+    vinculo: vinculo,
+    guardarVinculo: guardarVinculo,
+    registrarse: registrarse,
+    entrar: entrar,
+    salir: salir,
+    crearLiga: crearLiga,
+    unirse: unirse,
+    subirFoto: subirFoto,
+    descargarFoto: descargarFoto,
+    miembros: miembros,
+    entradas: entradas,
+    votos: votos,
+    guardarFilas: guardarFilas,
+    borrarEntrada: borrarEntrada,
+    guardarReglas: guardarReglas,
+    miLiga: miLiga,
+    pedir: pedirConSesion
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  global.Nube = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+/*
+ * sincro.js — juntar lo del movil con lo del servidor.
+ *
+ * La app sigue siendo local: se apunta en el movil y se guarda ahi al momento,
+ * con o sin cobertura. Esto solo sube lo que falta y baja lo de los demas.
+ *
+ * Todo se identifica por el id que genera el propio movil, asi que subir dos
+ * veces lo mismo no duplica nada. Eso permite sincronizar a lo bruto cada vez
+ * en vez de llevar la cuenta de lo que ya se envio, que es donde suelen estar
+ * los fallos raros.
+ */
+(function (global) {
+  'use strict';
+
+  var N = global.Nube;
+  var D = global.Datos;
+  var E = global.Estadisticas;
+
+  /** ¿Esta la app enlazada a una liga del servidor? */
+  function enNube() {
+    return !!(N && N.configurada() && N.conectado() && N.vinculo());
+  }
+
+  function miId() {
+    var u = N.usuario();
+    return u ? u.id : null;
+  }
+
+  // --- Traduccion entre lo de aqui y lo de alla -----------------------------
+
+  function aServidor(entrada, ligaId) {
+    return {
+      id: entrada.id,
+      liga_id: ligaId,
+      usuario: entrada.jugadorId,
+      fecha: new Date(entrada.fecha).toISOString(),
+      rechazo: !!entrada.rechazo,
+      fiesta: !!entrada.fiesta,
+      lugar: entrada.lugar || null,
+      resultado: entrada.resultado,
+      foto: entrada.fotoNube || null,
+      perfil: entrada.perfil || null
+    };
+  }
+
+  function aLocal(fila) {
+    return {
+      id: fila.id,
+      jugadorId: fila.usuario,
+      fecha: fila.fecha,
+      rechazo: !!fila.rechazo,
+      fiesta: !!fila.fiesta,
+      lugar: fila.lugar,
+      resultado: fila.resultado,
+      perfil: fila.perfil || null,
+      fotoNube: fila.foto || null,
+      // Si la foto esta en el servidor pero todavia no en este movil, se baja
+      // solo cuando haga falta verla (al ir a votar).
+      tieneFoto: !!D.leerFoto(fila.id)
+    };
+  }
+
+  // --- Enlazar ---------------------------------------------------------------
+
+  /**
+   * Pasa la liga de este movil a la nube. Las entradas propias se conservan y
+   * cambian de dueno al usuario de verdad; los jugadores inventados a mano
+   * desaparecen, porque a partir de ahora los jugadores son quienes entran.
+   */
+  function adoptarLiga(estado, liga) {
+    var yo = miId();
+    var anterior = estado.yo;
+
+    estado.entradas.forEach(function (e) {
+      if (e.jugadorId === anterior) e.jugadorId = yo;
+    });
+
+    Object.keys(estado.votos).forEach(function (entradaId) {
+      var votos = estado.votos[entradaId];
+      if (votos[anterior] !== undefined) {
+        votos[yo] = votos[anterior];
+        delete votos[anterior];
+      }
+    });
+
+    // Fuera lo que no sea de nadie real: los jugadores llegan de los miembros.
+    estado.entradas = estado.entradas.filter(function (e) { return e.jugadorId === yo; });
+    estado.jugadores = [];
+    estado.yo = yo;
+    estado.liga.nombre = liga.nombre;
+
+    return estado;
+  }
+
+  // --- Sincronizar ----------------------------------------------------------
+
+  function fusionaMiembros(estado, filas) {
+    estado.jugadores = filas.map(function (m) {
+      return { id: m.usuario, nombre: m.nombre, color: m.color, creado: m.unido };
+    });
+    var existe = estado.jugadores.some(function (j) { return j.id === estado.yo; });
+    if (!existe && estado.jugadores.length) estado.yo = miId() || estado.jugadores[0].id;
+  }
+
+  function fusionaEntradas(estado, filas) {
+    var porId = {};
+    estado.entradas.forEach(function (e) { porId[e.id] = e; });
+
+    filas.forEach(function (fila) {
+      var local = porId[fila.id];
+      if (!local) {
+        estado.entradas.push(aLocal(fila));
+        return;
+      }
+      // Lo que manda el servidor sobre lo que ya hay: el otro pudo corregirla.
+      local.fotoNube = fila.foto || local.fotoNube || null;
+      local.perfil = fila.perfil || local.perfil || null;
+      local.resultado = fila.resultado;
+      local.rechazo = !!fila.rechazo;
+      local.fiesta = !!fila.fiesta;
+      local.lugar = fila.lugar;
+    });
+  }
+
+  function fusionaVotos(estado, filas) {
+    filas.forEach(function (fila) {
+      if (!estado.votos[fila.entrada_id]) estado.votos[fila.entrada_id] = {};
+      estado.votos[fila.entrada_id][fila.usuario] = fila.nota;
+    });
+  }
+
+  function misEntradas(estado) {
+    var yo = miId();
+    return estado.entradas.filter(function (e) { return e.jugadorId === yo; });
+  }
+
+  /** Sube las fotos que aun estan solo en este movil y anota su ruta. */
+  function subirFotosPendientes(estado, ligaId) {
+    var pendientes = misEntradas(estado).filter(function (e) {
+      return e.tieneFoto && !e.fotoNube;
+    });
+    return pendientes.reduce(function (cadena, entrada) {
+      return cadena.then(function () {
+        var dataUrl = D.leerFoto(entrada.id);
+        if (!dataUrl) return null;
+        return N.subirFoto(ligaId, entrada.id, dataUrl).then(function (ruta) {
+          entrada.fotoNube = ruta;
+        }).catch(function (err) {
+          // Una foto que no sube no puede tumbar la sincronizacion entera.
+          console.warn('No se pudo subir la foto de', entrada.id, err);
+        });
+      });
+    }, Promise.resolve());
+  }
+
+  /**
+   * Baja solo las fotos que hacen falta para votar ahora mismo. Bajarlas todas
+   * llenaria la memoria del navegador, que son unos 5 MB contados.
+   */
+  function bajarFotosParaVotar(estado) {
+    var yo = miId();
+    var pendientes = estado.entradas.filter(function (e) {
+      if (e.jugadorId === yo || !e.fotoNube || e.tieneFoto) return false;
+      var votos = estado.votos[e.id] || {};
+      return votos[yo] === undefined;
+    }).slice(0, 20);
+
+    return pendientes.reduce(function (cadena, entrada) {
+      return cadena.then(function () {
+        return N.descargarFoto(entrada.fotoNube).then(function (dataUrl) {
+          if (D.guardarFoto(entrada.id, dataUrl).ok) entrada.tieneFoto = true;
+        }).catch(function (err) {
+          console.warn('No se pudo bajar la foto de', entrada.id, err);
+        });
+      });
+    }, Promise.resolve());
+  }
+
+  function misVotos(estado) {
+    var yo = miId();
+    var filas = [];
+    Object.keys(estado.votos).forEach(function (entradaId) {
+      var nota = estado.votos[entradaId][yo];
+      if (nota >= 1 && nota <= 10) {
+        filas.push({ entrada_id: entradaId, usuario: yo, nota: nota });
+      }
+    });
+    return filas;
+  }
+
+  /**
+   * Una pasada completa: subir lo mio, bajar lo de todos, guardar.
+   * Devuelve un resumen para poder decir algo util por pantalla.
+   */
+  function sincronizar(estado) {
+    if (!enNube()) return Promise.resolve({ omitido: true });
+
+    var ligaId = N.vinculo().id;
+    var resumen = { subidas: 0, bajadas: 0 };
+
+    return subirFotosPendientes(estado, ligaId)
+      .then(function () {
+        var mias = misEntradas(estado).map(function (e) { return aServidor(e, ligaId); });
+        resumen.subidas = mias.length;
+        return N.guardarFilas('entradas', mias);
+      })
+      .then(function () { return N.guardarFilas('votos', misVotos(estado)); })
+      .then(function () { return N.miembros(ligaId); })
+      .then(function (filas) { fusionaMiembros(estado, filas || []); })
+      .then(function () { return N.entradas(ligaId); })
+      .then(function (filas) {
+        resumen.bajadas = (filas || []).length;
+        fusionaEntradas(estado, filas || []);
+      })
+      .then(function () { return N.votos(ligaId); })
+      .then(function (filas) { fusionaVotos(estado, filas || []); })
+      .then(function () { return bajarFotosParaVotar(estado); })
+      .then(function () {
+        D.guardar(estado);
+        return resumen;
+      });
+  }
+
+  var api = {
+    enNube: enNube,
+    miId: miId,
+    adoptarLiga: adoptarLiga,
+    sincronizar: sincronizar,
+    aServidor: aServidor,
+    aLocal: aLocal
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  global.Sincro = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+/*
  * app.js — pantallas, navegacion y el asistente de registro.
  *
  * La logica de puntos esta en reglas.js y la de clasificaciones en
@@ -1642,6 +2289,10 @@ window.ConfigNube = {
         (r.extras ? ' · ' + r.extras + ' fuera de liga' : '');
     } else {
       texto = 'Elige quien eres arriba a la derecha.';
+    }
+    if (enNube()) {
+      texto += ' · <span class="estado-nube">' +
+        (sincronizando ? 'sincronizando…' : '☁ en comun') + '</span>';
     }
     $('#barra-liga').innerHTML = texto;
   }
@@ -1972,6 +2623,7 @@ window.ConfigNube = {
     borrador = nuevoBorrador();
     aviso('Apuntada. ' + R.redondea(puntos) + ' pts');
     pintar();
+    sincronizarAhora(true);
   }
 
   function pintarHistorialPropio() {
@@ -2209,6 +2861,7 @@ window.ConfigNube = {
     persistir();
     aviso('Votado: ' + nota);
     pintar();
+    sincronizarAhora(true);
   }
 
   // --- Campeones ------------------------------------------------------------
@@ -2264,9 +2917,212 @@ window.ConfigNube = {
       : '<div class="vacio">Sin historial todavia</div>';
   }
 
+  // --- Liga en comun --------------------------------------------------------
+
+  var N = window.Nube;
+  var S = window.Sincro;
+  var sincronizando = false;
+
+  function enNube() { return S && S.enNube(); }
+
+  function pintarNube() {
+    var caja = $('#aj-nube');
+    if (!N || !N.configurada()) { caja.hidden = true; return; }
+    caja.hidden = false;
+
+    var destino = $('#nube-contenido');
+
+    if (!N.conectado()) {
+      destino.innerHTML =
+        '<p class="ayuda">Entra con tu correo para jugar la liga con los demas. ' +
+        'Mientras no entres, la app funciona igual pero solo en este movil.</p>' +
+        '<div class="campo"><label for="nube-email">Correo</label>' +
+        '<input id="nube-email" type="email" autocomplete="email" autocapitalize="off" placeholder="tu@correo.com"></div>' +
+        '<div class="campo"><label for="nube-clave">Contrasena</label>' +
+        '<input id="nube-clave" type="password" autocomplete="current-password" placeholder="minimo 6 caracteres"></div>' +
+        '<div class="botonera">' +
+        '<button id="nube-entrar" class="btn btn-principal" type="button">Entrar</button>' +
+        '<button id="nube-registrar" class="btn btn-secundario" type="button">Crear cuenta</button>' +
+        '</div>' +
+        '<p id="nube-aviso" class="ayuda"></p>';
+      conectarEntrada();
+      return;
+    }
+
+    var v = N.vinculo();
+    var correo = (N.usuario() || {}).email || '';
+
+    if (!v) {
+      destino.innerHTML =
+        '<p class="ayuda">Estas dentro como <strong>' + esc(correo) + '</strong>. ' +
+        'Ahora: crea la liga, o unete a la de un amigo con su codigo.</p>' +
+        '<div class="campo"><label for="nube-nombre">Crear una liga nueva</label>' +
+        '<input id="nube-nombre" type="text" placeholder="Nombre de la liga" value="' + esc(estado.liga.nombre || '') + '"></div>' +
+        '<button id="nube-crear" class="btn btn-principal ancho" type="button">Crear la liga</button>' +
+        '<div class="campo" style="margin-top:18px"><label for="nube-codigo">O unirte con un codigo</label>' +
+        '<input id="nube-codigo" type="text" autocapitalize="characters" placeholder="LIGA-XXXXX"></div>' +
+        '<button id="nube-unirse" class="btn btn-secundario ancho" type="button">Unirme</button>' +
+        '<p id="nube-aviso" class="ayuda"></p>' +
+        '<button id="nube-salir" class="btn ancho" type="button" style="margin-top:18px">Cerrar sesion</button>';
+      conectarSinLiga();
+      return;
+    }
+
+    destino.innerHTML =
+      '<p class="ayuda">Jugando <strong>' + esc(v.nombre) + '</strong> como ' + esc(correo) + '.</p>' +
+      '<div class="codigo-liga">' +
+      '<span class="etiqueta">Codigo para que entren tus amigos</span>' +
+      '<strong id="nube-codigo-liga">' + esc(v.codigo) + '</strong>' +
+      '<button id="nube-copiar" class="btn btn-secundario" type="button">Copiar</button>' +
+      '</div>' +
+      '<p class="ayuda">Pasales ese codigo y la direccion de la app. Se registran, ' +
+      'lo meten y ya estan dentro.</p>' +
+      '<button id="nube-sincronizar" class="btn btn-principal ancho" type="button">Sincronizar ahora</button>' +
+      '<p id="nube-aviso" class="ayuda"></p>' +
+      '<button id="nube-desvincular" class="btn ancho" type="button">Salir de esta liga</button>' +
+      '<button id="nube-salir" class="btn ancho" type="button">Cerrar sesion</button>';
+    conectarEnLiga();
+  }
+
+  function avisoNube(texto, malo) {
+    var caja = $('#nube-aviso');
+    if (!caja) return;
+    caja.textContent = texto;
+    caja.style.color = malo ? '#ff8a8d' : '';
+  }
+
+  function ocupado(id, texto) {
+    var b = $(id);
+    if (b) { b.disabled = true; b.dataset.textoOriginal = b.textContent; b.textContent = texto; }
+  }
+
+  function libre(id) {
+    var b = $(id);
+    if (b && b.dataset.textoOriginal) { b.disabled = false; b.textContent = b.dataset.textoOriginal; }
+  }
+
+  function conectarEntrada() {
+    function credenciales() {
+      return { email: $('#nube-email').value, clave: $('#nube-clave').value };
+    }
+    function tras(promesa, boton) {
+      avisoNube('Conectando...');
+      promesa.then(function () {
+        avisoNube('');
+        pintar();
+        sincronizarAhora(true);
+      }).catch(function (err) {
+        libre(boton);
+        avisoNube(err.message, true);
+      });
+    }
+    $('#nube-entrar').addEventListener('click', function () {
+      var c = credenciales();
+      ocupado('#nube-entrar', 'Entrando...');
+      tras(N.entrar(c.email, c.clave), '#nube-entrar');
+    });
+    $('#nube-registrar').addEventListener('click', function () {
+      var c = credenciales();
+      if (String(c.clave).length < 6) { avisoNube('La contrasena necesita 6 caracteres o mas', true); return; }
+      ocupado('#nube-registrar', 'Creando...');
+      tras(N.registrarse(c.email, c.clave), '#nube-registrar');
+    });
+  }
+
+  function conectarSinLiga() {
+    $('#nube-crear').addEventListener('click', function () {
+      var nombre = $('#nube-nombre').value.trim() || 'La Liga';
+      var yo = jugador(estado.yo);
+      var mias = yo ? E.entradasDe(estado, yo.id).length : 0;
+      var otros = estado.jugadores.length - (yo ? 1 : 0);
+      if (otros > 0 && !confirm('Los jugadores que apuntaste a mano se sustituyen por los que ' +
+        'entren de verdad con su cuenta, y sus entradas se borran. Las tuyas (' + mias + ') se ' +
+        'conservan y suben. ¿Seguimos?')) return;
+
+      ocupado('#nube-crear', 'Creando...');
+      avisoNube('Creando la liga...');
+      N.crearLiga(nombre, yo ? yo.nombre : 'Yo', yo ? yo.color : undefined, estado.reglas)
+        .then(function (liga) {
+          estado = S.adoptarLiga(estado, liga);
+          persistir();
+          return sincronizarAhora(true);
+        })
+        .then(function () { pintar(); })
+        .catch(function (err) { libre('#nube-crear'); avisoNube(err.message, true); });
+    });
+
+    $('#nube-unirse').addEventListener('click', function () {
+      var codigo = $('#nube-codigo').value.trim();
+      if (!codigo) { avisoNube('Escribe el codigo que te han pasado', true); return; }
+      var yo = jugador(estado.yo);
+      if (!confirm('Te unes a la liga ' + codigo + '. Lo que hayas apuntado de otros jugadores ' +
+        'en este movil se borra; lo tuyo se conserva. ¿Seguimos?')) return;
+
+      ocupado('#nube-unirse', 'Entrando...');
+      avisoNube('Buscando la liga...');
+      N.unirse(codigo, yo ? yo.nombre : 'Yo', yo ? yo.color : undefined)
+        .then(function (liga) {
+          estado = S.adoptarLiga(estado, liga);
+          persistir();
+          return sincronizarAhora(true);
+        })
+        .then(function () { pintar(); })
+        .catch(function (err) { libre('#nube-unirse'); avisoNube(err.message, true); });
+    });
+
+    $('#nube-salir').addEventListener('click', cerrarSesionNube);
+  }
+
+  function conectarEnLiga() {
+    $('#nube-copiar').addEventListener('click', function () {
+      var codigo = N.vinculo().codigo;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(codigo).then(function () { aviso('Codigo copiado'); });
+      } else {
+        aviso('Apuntalo: ' + codigo);
+      }
+    });
+    $('#nube-sincronizar').addEventListener('click', function () { sincronizarAhora(); });
+    $('#nube-salir').addEventListener('click', cerrarSesionNube);
+    $('#nube-desvincular').addEventListener('click', function () {
+      if (!confirm('Dejas de compartir la liga. Lo que ya tienes se queda en este movil. ¿Seguro?')) return;
+      N.guardarVinculo(null);
+      aviso('Ya no estas en la liga compartida');
+      pintar();
+    });
+  }
+
+  function cerrarSesionNube() {
+    if (!confirm('Cerrar sesion. Lo que tengas en este movil se queda. ¿Seguro?')) return;
+    N.salir().then(function () { aviso('Sesion cerrada'); pintar(); });
+  }
+
+  /** Una pasada de sincronizacion, avisando por pantalla de como va. */
+  function sincronizarAhora(silencioso) {
+    if (!enNube() || sincronizando) return Promise.resolve();
+    sincronizando = true;
+    if (!silencioso) avisoNube('Sincronizando...');
+    pintarCabecera();
+
+    return S.sincronizar(estado).then(function (resumen) {
+      sincronizando = false;
+      if (resumen && resumen.omitido) return;
+      estado = D.cargar();
+      pintar();
+      // Despues de pintar: pintarNube() rehace la tarjeta y se llevaria el aviso.
+      if (!silencioso) avisoNube('Al dia · ' + resumen.bajadas + ' entradas en la liga');
+    }).catch(function (err) {
+      sincronizando = false;
+      libre('#nube-sincronizar');
+      avisoNube(err.message, true);
+      pintarCabecera();
+    });
+  }
+
   // --- Ajustes --------------------------------------------------------------
 
   function pintarAjustes() {
+    pintarNube();
     $('#aj-nombre-liga').value = estado.liga.nombre || '';
     $('#aj-limite').value = estado.reglas.limiteLiga;
     $('#aj-dj').checked = !!estado.reglas.djCuentaComoDiscoteca;
@@ -2306,6 +3162,12 @@ window.ConfigNube = {
         '<td class="num"><input type="number" step="0.5" data-punto="' + res.id + '" data-donde="dentro" value="' + p.dentro + '"></td>' +
         '<td class="num"><input type="number" step="0.5" data-punto="' + res.id + '" data-donde="fuera" value="' + p.fuera + '"></td></tr>';
     }).join('');
+
+    // En modo compartido los jugadores son quienes entran con su cuenta, no
+    // una lista que se escribe a mano.
+    var enComun = enNube();
+    $('#aj-nuevo-jugador').parentNode.hidden = enComun;
+    $$('#aj-jugadores [data-eliminar]').forEach(function (b) { b.hidden = enComun; });
 
     var kb = Math.round(D.espacioUsado() / 1024);
     $('#aj-espacio').textContent = 'Ocupado ahora mismo: ' + (kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB') +
@@ -2571,6 +3433,8 @@ window.ConfigNube = {
     $('#reg-fecha').value = hoyISO();
     conectar();
     pintar();
+
+    sincronizarAhora(true);
 
     if (!D.guardadoPermanente()) {
       var banda = $('#aviso-temporal');

@@ -307,6 +307,57 @@
     });
   }
 
+  // --- Leer y escribir la liga ---------------------------------------------
+
+  function miembros(ligaId) {
+    return pedirConSesion('/rest/v1/miembros?select=*&liga_id=eq.' + encodeURIComponent(ligaId));
+  }
+
+  function entradas(ligaId) {
+    return pedirConSesion('/rest/v1/entradas?select=*&liga_id=eq.' +
+      encodeURIComponent(ligaId) + '&order=fecha.asc');
+  }
+
+  /**
+   * Los votos no llevan liga_id: cuelgan de la entrada. PostgREST permite
+   * filtrar por la tabla relacionada con !inner, que es justo lo que hace falta.
+   */
+  function votos(ligaId) {
+    return pedirConSesion('/rest/v1/votos?select=entrada_id,usuario,nota,entradas!inner(liga_id)' +
+      '&entradas.liga_id=eq.' + encodeURIComponent(ligaId));
+  }
+
+  /** Upsert: repetir el envio de algo ya subido no duplica ni falla. */
+  function guardarFilas(tabla, filas) {
+    if (!filas.length) return Promise.resolve([]);
+    return pedirConSesion('/rest/v1/' + tabla, {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: filas
+    });
+  }
+
+  function borrarEntrada(id) {
+    return pedirConSesion('/rest/v1/entradas?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' }
+    });
+  }
+
+  function guardarReglas(ligaId, reglas) {
+    return pedirConSesion('/rest/v1/ligas?id=eq.' + encodeURIComponent(ligaId), {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: { reglas: reglas }
+    });
+  }
+
+  function miLiga() {
+    return pedirConSesion('/rest/v1/ligas?select=*').then(function (filas) {
+      return filas && filas.length ? filas[0] : null;
+    });
+  }
+
   var api = {
     configurada: configurada,
     conectado: conectado,
@@ -320,6 +371,13 @@
     unirse: unirse,
     subirFoto: subirFoto,
     descargarFoto: descargarFoto,
+    miembros: miembros,
+    entradas: entradas,
+    votos: votos,
+    guardarFilas: guardarFilas,
+    borrarEntrada: borrarEntrada,
+    guardarReglas: guardarReglas,
+    miLiga: miLiga,
     pedir: pedirConSesion
   };
 

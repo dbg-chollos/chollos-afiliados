@@ -10,9 +10,14 @@
  *    es una copia comun que se sincroniza cuando hay internet. Si estas en el
  *    garito sin cobertura, apuntas igual y sube luego.
  *
- * 2. Se entra con un codigo de 6 digitos que llega por correo, no con un enlace.
- *    Un enlace abriria el navegador en vez de la app instalada y la sesion se
- *    quedaria en el sitio equivocado.
+ * 2. Se entra con correo y contrasena, sin nada por correo electronico. Las dos
+ *    alternativas se descartaron por lo mismo: el plan gratuito de Supabase
+ *    manda muy pocos correos por hora, asi que si cuatro amigos se registran la
+ *    misma noche, los ultimos se quedan esperando un correo que no llega. Y un
+ *    enlace magico, ademas, abriria el navegador en vez de la app instalada.
+ *
+ *    Para que esto funcione hay que desactivar "Confirm email" en el panel
+ *    (Authentication -> Sign In / Providers -> Email).
  */
 (function (global) {
   'use strict';
@@ -152,25 +157,58 @@
 
   // --- Entrar y salir -------------------------------------------------------
 
-  /** Manda el codigo de 6 digitos al correo. */
-  function pedirCodigo(email) {
-    return pedir('/auth/v1/otp', {
-      method: 'POST',
-      conSesion: false,
-      body: { email: String(email).trim(), create_user: true }
-    });
+  function limpiaCorreo(email) {
+    return String(email || '').trim().toLowerCase();
   }
 
-  function entrar(email, codigo) {
-    return pedir('/auth/v1/verify', {
+  /**
+   * Traduce los mensajes de Supabase, que vienen en ingles y de tecnico.
+   * Alguien que se registra a las cuatro de la manana no merece leer
+   * "Invalid login credentials".
+   */
+  function enCristiano(err) {
+    var texto = (err && err.message ? err.message : '').toLowerCase();
+    if (texto.indexOf('invalid login credentials') !== -1) {
+      return new Error('El correo o la contrasena no son correctos');
+    }
+    if (texto.indexOf('already registered') !== -1 || texto.indexOf('already exists') !== -1) {
+      return new Error('Ese correo ya tiene cuenta: entra en vez de registrarte');
+    }
+    if (texto.indexOf('password should be') !== -1 || texto.indexOf('at least') !== -1) {
+      return new Error('La contrasena tiene que tener 6 caracteres o mas');
+    }
+    if (texto.indexOf('email not confirmed') !== -1) {
+      return new Error('Falta desactivar "Confirm email" en el panel de Supabase');
+    }
+    if (texto.indexOf('failed to fetch') !== -1 || texto.indexOf('networkerror') !== -1) {
+      return new Error('Sin conexion. Se guarda en el movil y sube cuando vuelvas a tener internet');
+    }
+    return err;
+  }
+
+  function guardarYDevolver(datos) {
+    if (!datos || !datos.access_token) {
+      throw new Error('El servidor no ha devuelto una sesion');
+    }
+    guardarSesion(datos);
+    return datos;
+  }
+
+  /** Crear cuenta. Sin "Confirm email" activo, entra directamente. */
+  function registrarse(email, contrasena) {
+    return pedir('/auth/v1/signup', {
       method: 'POST',
       conSesion: false,
-      body: { email: String(email).trim(), token: String(codigo).trim(), type: 'email' }
-    }).then(function (datos) {
-      if (!datos || !datos.access_token) throw new Error('El codigo no es valido');
-      guardarSesion(datos);
-      return datos;
-    });
+      body: { email: limpiaCorreo(email), password: String(contrasena) }
+    }).then(guardarYDevolver).catch(function (err) { throw enCristiano(err); });
+  }
+
+  function entrar(email, contrasena) {
+    return pedir('/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      conSesion: false,
+      body: { email: limpiaCorreo(email), password: String(contrasena) }
+    }).then(guardarYDevolver).catch(function (err) { throw enCristiano(err); });
   }
 
   function salir() {
@@ -269,19 +307,77 @@
     });
   }
 
+  // --- Leer y escribir la liga ---------------------------------------------
+
+  function miembros(ligaId) {
+    return pedirConSesion('/rest/v1/miembros?select=*&liga_id=eq.' + encodeURIComponent(ligaId));
+  }
+
+  function entradas(ligaId) {
+    return pedirConSesion('/rest/v1/entradas?select=*&liga_id=eq.' +
+      encodeURIComponent(ligaId) + '&order=fecha.asc');
+  }
+
+  /**
+   * Los votos no llevan liga_id: cuelgan de la entrada. PostgREST permite
+   * filtrar por la tabla relacionada con !inner, que es justo lo que hace falta.
+   */
+  function votos(ligaId) {
+    return pedirConSesion('/rest/v1/votos?select=entrada_id,usuario,nota,entradas!inner(liga_id)' +
+      '&entradas.liga_id=eq.' + encodeURIComponent(ligaId));
+  }
+
+  /** Upsert: repetir el envio de algo ya subido no duplica ni falla. */
+  function guardarFilas(tabla, filas) {
+    if (!filas.length) return Promise.resolve([]);
+    return pedirConSesion('/rest/v1/' + tabla, {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: filas
+    });
+  }
+
+  function borrarEntrada(id) {
+    return pedirConSesion('/rest/v1/entradas?id=eq.' + encodeURIComponent(id), {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' }
+    });
+  }
+
+  function guardarReglas(ligaId, reglas) {
+    return pedirConSesion('/rest/v1/ligas?id=eq.' + encodeURIComponent(ligaId), {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: { reglas: reglas }
+    });
+  }
+
+  function miLiga() {
+    return pedirConSesion('/rest/v1/ligas?select=*').then(function (filas) {
+      return filas && filas.length ? filas[0] : null;
+    });
+  }
+
   var api = {
     configurada: configurada,
     conectado: conectado,
     usuario: usuario,
     vinculo: vinculo,
     guardarVinculo: guardarVinculo,
-    pedirCodigo: pedirCodigo,
+    registrarse: registrarse,
     entrar: entrar,
     salir: salir,
     crearLiga: crearLiga,
     unirse: unirse,
     subirFoto: subirFoto,
     descargarFoto: descargarFoto,
+    miembros: miembros,
+    entradas: entradas,
+    votos: votos,
+    guardarFilas: guardarFilas,
+    borrarEntrada: borrarEntrada,
+    guardarReglas: guardarReglas,
+    miLiga: miLiga,
     pedir: pedirConSesion
   };
 

@@ -140,6 +140,23 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
 .opcion-lista input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--acento); flex: 0 0 auto; }
 .opcion-lista .ayuda { margin: 3px 0 0; }
 
+.codigo-liga {
+  background: var(--fondo-2);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  margin: 12px 0;
+}
+.codigo-liga .etiqueta { display: block; font-size: .74rem; color: var(--apagado); margin-bottom: 6px; }
+.codigo-liga strong {
+  display: block; font-size: 1.5rem; letter-spacing: 2px;
+  color: var(--acento-2); font-variant-numeric: tabular-nums; margin-bottom: 10px;
+}
+.codigo-liga .btn { width: 100%; }
+
+.estado-nube { color: #6fd3a5; }
+
 .zona-foto input[type=text] { margin-bottom: 4px; }
 .enlace-perfil { text-decoration: none; text-align: center; margin: 0 0 10px; }
 

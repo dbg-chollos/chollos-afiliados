@@ -152,6 +152,10 @@
     } else {
       texto = 'Elige quien eres arriba a la derecha.';
     }
+    if (enNube()) {
+      texto += ' · <span class="estado-nube">' +
+        (sincronizando ? 'sincronizando…' : '☁ en comun') + '</span>';
+    }
     $('#barra-liga').innerHTML = texto;
   }
 
@@ -481,6 +485,7 @@
     borrador = nuevoBorrador();
     aviso('Apuntada. ' + R.redondea(puntos) + ' pts');
     pintar();
+    sincronizarAhora(true);
   }
 
   function pintarHistorialPropio() {
@@ -718,6 +723,7 @@
     persistir();
     aviso('Votado: ' + nota);
     pintar();
+    sincronizarAhora(true);
   }
 
   // --- Campeones ------------------------------------------------------------
@@ -773,9 +779,212 @@
       : '<div class="vacio">Sin historial todavia</div>';
   }
 
+  // --- Liga en comun --------------------------------------------------------
+
+  var N = window.Nube;
+  var S = window.Sincro;
+  var sincronizando = false;
+
+  function enNube() { return S && S.enNube(); }
+
+  function pintarNube() {
+    var caja = $('#aj-nube');
+    if (!N || !N.configurada()) { caja.hidden = true; return; }
+    caja.hidden = false;
+
+    var destino = $('#nube-contenido');
+
+    if (!N.conectado()) {
+      destino.innerHTML =
+        '<p class="ayuda">Entra con tu correo para jugar la liga con los demas. ' +
+        'Mientras no entres, la app funciona igual pero solo en este movil.</p>' +
+        '<div class="campo"><label for="nube-email">Correo</label>' +
+        '<input id="nube-email" type="email" autocomplete="email" autocapitalize="off" placeholder="tu@correo.com"></div>' +
+        '<div class="campo"><label for="nube-clave">Contrasena</label>' +
+        '<input id="nube-clave" type="password" autocomplete="current-password" placeholder="minimo 6 caracteres"></div>' +
+        '<div class="botonera">' +
+        '<button id="nube-entrar" class="btn btn-principal" type="button">Entrar</button>' +
+        '<button id="nube-registrar" class="btn btn-secundario" type="button">Crear cuenta</button>' +
+        '</div>' +
+        '<p id="nube-aviso" class="ayuda"></p>';
+      conectarEntrada();
+      return;
+    }
+
+    var v = N.vinculo();
+    var correo = (N.usuario() || {}).email || '';
+
+    if (!v) {
+      destino.innerHTML =
+        '<p class="ayuda">Estas dentro como <strong>' + esc(correo) + '</strong>. ' +
+        'Ahora: crea la liga, o unete a la de un amigo con su codigo.</p>' +
+        '<div class="campo"><label for="nube-nombre">Crear una liga nueva</label>' +
+        '<input id="nube-nombre" type="text" placeholder="Nombre de la liga" value="' + esc(estado.liga.nombre || '') + '"></div>' +
+        '<button id="nube-crear" class="btn btn-principal ancho" type="button">Crear la liga</button>' +
+        '<div class="campo" style="margin-top:18px"><label for="nube-codigo">O unirte con un codigo</label>' +
+        '<input id="nube-codigo" type="text" autocapitalize="characters" placeholder="LIGA-XXXXX"></div>' +
+        '<button id="nube-unirse" class="btn btn-secundario ancho" type="button">Unirme</button>' +
+        '<p id="nube-aviso" class="ayuda"></p>' +
+        '<button id="nube-salir" class="btn ancho" type="button" style="margin-top:18px">Cerrar sesion</button>';
+      conectarSinLiga();
+      return;
+    }
+
+    destino.innerHTML =
+      '<p class="ayuda">Jugando <strong>' + esc(v.nombre) + '</strong> como ' + esc(correo) + '.</p>' +
+      '<div class="codigo-liga">' +
+      '<span class="etiqueta">Codigo para que entren tus amigos</span>' +
+      '<strong id="nube-codigo-liga">' + esc(v.codigo) + '</strong>' +
+      '<button id="nube-copiar" class="btn btn-secundario" type="button">Copiar</button>' +
+      '</div>' +
+      '<p class="ayuda">Pasales ese codigo y la direccion de la app. Se registran, ' +
+      'lo meten y ya estan dentro.</p>' +
+      '<button id="nube-sincronizar" class="btn btn-principal ancho" type="button">Sincronizar ahora</button>' +
+      '<p id="nube-aviso" class="ayuda"></p>' +
+      '<button id="nube-desvincular" class="btn ancho" type="button">Salir de esta liga</button>' +
+      '<button id="nube-salir" class="btn ancho" type="button">Cerrar sesion</button>';
+    conectarEnLiga();
+  }
+
+  function avisoNube(texto, malo) {
+    var caja = $('#nube-aviso');
+    if (!caja) return;
+    caja.textContent = texto;
+    caja.style.color = malo ? '#ff8a8d' : '';
+  }
+
+  function ocupado(id, texto) {
+    var b = $(id);
+    if (b) { b.disabled = true; b.dataset.textoOriginal = b.textContent; b.textContent = texto; }
+  }
+
+  function libre(id) {
+    var b = $(id);
+    if (b && b.dataset.textoOriginal) { b.disabled = false; b.textContent = b.dataset.textoOriginal; }
+  }
+
+  function conectarEntrada() {
+    function credenciales() {
+      return { email: $('#nube-email').value, clave: $('#nube-clave').value };
+    }
+    function tras(promesa, boton) {
+      avisoNube('Conectando...');
+      promesa.then(function () {
+        avisoNube('');
+        pintar();
+        sincronizarAhora(true);
+      }).catch(function (err) {
+        libre(boton);
+        avisoNube(err.message, true);
+      });
+    }
+    $('#nube-entrar').addEventListener('click', function () {
+      var c = credenciales();
+      ocupado('#nube-entrar', 'Entrando...');
+      tras(N.entrar(c.email, c.clave), '#nube-entrar');
+    });
+    $('#nube-registrar').addEventListener('click', function () {
+      var c = credenciales();
+      if (String(c.clave).length < 6) { avisoNube('La contrasena necesita 6 caracteres o mas', true); return; }
+      ocupado('#nube-registrar', 'Creando...');
+      tras(N.registrarse(c.email, c.clave), '#nube-registrar');
+    });
+  }
+
+  function conectarSinLiga() {
+    $('#nube-crear').addEventListener('click', function () {
+      var nombre = $('#nube-nombre').value.trim() || 'La Liga';
+      var yo = jugador(estado.yo);
+      var mias = yo ? E.entradasDe(estado, yo.id).length : 0;
+      var otros = estado.jugadores.length - (yo ? 1 : 0);
+      if (otros > 0 && !confirm('Los jugadores que apuntaste a mano se sustituyen por los que ' +
+        'entren de verdad con su cuenta, y sus entradas se borran. Las tuyas (' + mias + ') se ' +
+        'conservan y suben. ¿Seguimos?')) return;
+
+      ocupado('#nube-crear', 'Creando...');
+      avisoNube('Creando la liga...');
+      N.crearLiga(nombre, yo ? yo.nombre : 'Yo', yo ? yo.color : undefined, estado.reglas)
+        .then(function (liga) {
+          estado = S.adoptarLiga(estado, liga);
+          persistir();
+          return sincronizarAhora(true);
+        })
+        .then(function () { pintar(); })
+        .catch(function (err) { libre('#nube-crear'); avisoNube(err.message, true); });
+    });
+
+    $('#nube-unirse').addEventListener('click', function () {
+      var codigo = $('#nube-codigo').value.trim();
+      if (!codigo) { avisoNube('Escribe el codigo que te han pasado', true); return; }
+      var yo = jugador(estado.yo);
+      if (!confirm('Te unes a la liga ' + codigo + '. Lo que hayas apuntado de otros jugadores ' +
+        'en este movil se borra; lo tuyo se conserva. ¿Seguimos?')) return;
+
+      ocupado('#nube-unirse', 'Entrando...');
+      avisoNube('Buscando la liga...');
+      N.unirse(codigo, yo ? yo.nombre : 'Yo', yo ? yo.color : undefined)
+        .then(function (liga) {
+          estado = S.adoptarLiga(estado, liga);
+          persistir();
+          return sincronizarAhora(true);
+        })
+        .then(function () { pintar(); })
+        .catch(function (err) { libre('#nube-unirse'); avisoNube(err.message, true); });
+    });
+
+    $('#nube-salir').addEventListener('click', cerrarSesionNube);
+  }
+
+  function conectarEnLiga() {
+    $('#nube-copiar').addEventListener('click', function () {
+      var codigo = N.vinculo().codigo;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(codigo).then(function () { aviso('Codigo copiado'); });
+      } else {
+        aviso('Apuntalo: ' + codigo);
+      }
+    });
+    $('#nube-sincronizar').addEventListener('click', function () { sincronizarAhora(); });
+    $('#nube-salir').addEventListener('click', cerrarSesionNube);
+    $('#nube-desvincular').addEventListener('click', function () {
+      if (!confirm('Dejas de compartir la liga. Lo que ya tienes se queda en este movil. ¿Seguro?')) return;
+      N.guardarVinculo(null);
+      aviso('Ya no estas en la liga compartida');
+      pintar();
+    });
+  }
+
+  function cerrarSesionNube() {
+    if (!confirm('Cerrar sesion. Lo que tengas en este movil se queda. ¿Seguro?')) return;
+    N.salir().then(function () { aviso('Sesion cerrada'); pintar(); });
+  }
+
+  /** Una pasada de sincronizacion, avisando por pantalla de como va. */
+  function sincronizarAhora(silencioso) {
+    if (!enNube() || sincronizando) return Promise.resolve();
+    sincronizando = true;
+    if (!silencioso) avisoNube('Sincronizando...');
+    pintarCabecera();
+
+    return S.sincronizar(estado).then(function (resumen) {
+      sincronizando = false;
+      if (resumen && resumen.omitido) return;
+      estado = D.cargar();
+      pintar();
+      // Despues de pintar: pintarNube() rehace la tarjeta y se llevaria el aviso.
+      if (!silencioso) avisoNube('Al dia · ' + resumen.bajadas + ' entradas en la liga');
+    }).catch(function (err) {
+      sincronizando = false;
+      libre('#nube-sincronizar');
+      avisoNube(err.message, true);
+      pintarCabecera();
+    });
+  }
+
   // --- Ajustes --------------------------------------------------------------
 
   function pintarAjustes() {
+    pintarNube();
     $('#aj-nombre-liga').value = estado.liga.nombre || '';
     $('#aj-limite').value = estado.reglas.limiteLiga;
     $('#aj-dj').checked = !!estado.reglas.djCuentaComoDiscoteca;
@@ -815,6 +1024,12 @@
         '<td class="num"><input type="number" step="0.5" data-punto="' + res.id + '" data-donde="dentro" value="' + p.dentro + '"></td>' +
         '<td class="num"><input type="number" step="0.5" data-punto="' + res.id + '" data-donde="fuera" value="' + p.fuera + '"></td></tr>';
     }).join('');
+
+    // En modo compartido los jugadores son quienes entran con su cuenta, no
+    // una lista que se escribe a mano.
+    var enComun = enNube();
+    $('#aj-nuevo-jugador').parentNode.hidden = enComun;
+    $$('#aj-jugadores [data-eliminar]').forEach(function (b) { b.hidden = enComun; });
 
     var kb = Math.round(D.espacioUsado() / 1024);
     $('#aj-espacio').textContent = 'Ocupado ahora mismo: ' + (kb > 1024 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB') +
@@ -1080,6 +1295,8 @@
     $('#reg-fecha').value = hoyISO();
     conectar();
     pintar();
+
+    sincronizarAhora(true);
 
     if (!D.guardadoPermanente()) {
       var banda = $('#aviso-temporal');

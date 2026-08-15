@@ -21,24 +21,27 @@ memoria (o para que otra sesión lo continúe). Actualizar al terminar cada paso
 - **Base de datos en Supabase**: creada y verificada por él con el esquema de
   `liga/supabase/esquema.sql` → 4 tablas, 12 políticas, bucket de fotos y sus
   3 políticas. Proyecto `arfiuoxsqgcnkwtalcwn`.
-- **Capa de conexión** (`liga/js/nube.js`): registro y entrada con correo y
-  contraseña, crear/unirse a liga, subir y bajar fotos, renovación de sesión. **Escrita
-  pero sin probar contra el servidor.**
+- **Liga compartida, entera y probada**: `liga/js/nube.js` (registro y entrada
+  con correo y contraseña, crear/unirse por código, fotos, renovación de
+  sesión), `liga/js/sincro.js` (subir lo propio, bajar lo de todos, fusionar) y
+  las pantallas en Ajustes.
+  Probada con un Supabase de mentira (`scratchpad/servidor-falso.js`) y dos
+  navegadores a la vez: Dani crea la liga, Javi entra con el código, ve la
+  clasificación, le baja la foto del servidor y la vota; Dani sincroniza y ve
+  la nota. **Falta probarla contra el Supabase de verdad**, que solo puede
+  hacerlo él: este entorno no puede salir a `*.supabase.co`.
 
 ## Lo siguiente
 
-1. **Acceso de red.** El entorno de la sesión bloquea `*.supabase.co`
-   (`CONNECT tunnel failed, 403`), así que no se puede probar nada contra el
-   servidor real. Él tiene que ponerlo en Network access → Custom.
-2. **Probar `nube.js`** de punta a punta: pedir código, entrar, crear liga,
-   unirse con el código, subir foto, votar.
-3. **Pantallas de la nube en la app**: entrar con el correo, crear liga o meter
-   código, y estado de sincronización. Aún no existen.
-4. **Sincronizar** el estado local con el servidor (subir lo que falte, bajar
-   lo de los demás, fusionar por id como ya hace `Datos.importar`).
-5. **Desactivar "Confirm email"** en Supabase (Authentication → Sign In /
-   Providers → Email). Sin eso nadie puede entrar tras registrarse.
-6. Conectar Netlify a la rama y renombrar el sitio.
+1. **Que lo pruebe él contra su Supabase**: registrarse, crear la liga, y que
+   un amigo entre con el código. Es el único que puede: este entorno no llega
+   a `*.supabase.co`.
+2. **Conectar Netlify** a la rama y renombrar el sitio, para que sus amigos
+   tengan una dirección propia que no dependa de nadie.
+3. Ideas sueltas que quedaron apuntadas: rachas, mapa de sitios, exportar la
+   clasificación como imagen para el grupo, histórico de ligas anteriores.
+
+Ya hecho por él: base de datos creada y "Confirm email" desactivado.
 
 ## Cosas que no hay que deshacer sin pensarlo
 
