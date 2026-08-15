@@ -3,8 +3,14 @@
 App para llevar la cuenta entre vosotros: cada entrada que haces, cómo acaba,
 cuántos puntos vale, quién va ganando, y campeón del día / de la semana / del mes.
 
-No hay servidor, no hay cuentas y no se sube nada a internet: **todo se guarda
-en el navegador del móvil que la usa**. Coste 0€, igual que el resto del repo.
+Funciona de dos maneras, y se puede pasar de una a otra cuando queráis:
+
+- **Sola en tu móvil**, sin cuentas ni internet. Es como arranca.
+- **En común**, entrando con tu correo: lo que apunta cualquiera lo veis todos y
+  las fotos aparecen solas para votar. Se activa en Ajustes → *Liga en común*.
+
+En los dos casos la app es local: se apunta en el móvil y se guarda al momento,
+con o sin cobertura. Coste 0€, igual que el resto del repo.
 
 ---
 
@@ -122,14 +128,21 @@ puntos → más entradas → mejor nota.
 
 ## Jugar entre varios
 
-Ahora mismo no hay servidor compartido, así que hay dos formas:
+**Lo normal: la liga en común.** En Ajustes → *Liga en común*, cada uno entra
+con su correo y una contraseña. Uno crea la liga y le sale un código
+(`LIGA-XXXXX`); los demás lo meten en *Unirme* y ya está. A partir de ahí se
+sincroniza solo: al abrir la app, al apuntar una entrada y al votar. Sin
+cobertura se guarda en el móvil y sube en la siguiente pasada.
 
-**A. Un móvil para todos.** Arriba a la derecha se cambia de jugador. Cada uno
-apunta lo suyo y vota lo de los demás en el mismo dispositivo. Es lo más
-cómodo si soléis salir juntos.
+Los datos van a Supabase (`liga/supabase/`), y quien no tenga el código no
+puede leer nada de esa liga: lo impide la propia base de datos, no la app.
 
-**B. Cada uno en su móvil.** Cada uno apunta lo suyo y, cuando queráis
-actualizar la clasificación, en Ajustes:
+### Sin servidor, si preferís no depender de nada
+
+**Un móvil para todos.** Arriba a la derecha se cambia de jugador. Cada uno
+apunta lo suyo y vota lo de los demás en el mismo dispositivo.
+
+**O cada uno en el suyo**, juntándolo a mano. En Ajustes:
 
 1. Cada uno le da a **Exportar con fotos** (si usáis el modo enlace, con
    *Exportar* a secas ya va todo lo necesario para votar).
@@ -146,8 +159,9 @@ dispositivo y pone lo del archivo.
 
 - **Haced copias.** Si borras los datos de navegación del móvil o desinstalas
   la app, la liga se va con ellos. Exportad de vez en cuando.
-- **Nada sale del móvil.** Ni entradas, ni enlaces, ni fotos. No se suben al
-  repo ni a la web de chollos. Solo viajan si tú exportas y mandas el archivo.
+- **Sin liga en común, nada sale del móvil.** Con ella activada, las entradas,
+  los puntos y las fotos van también a tu Supabase. A la web de chollos no llega
+  nada en ningún caso.
 - **Espacio.** El navegador da unos 5 MB. En modo enlace no ocupa
   prácticamente nada. En modo foto se reducen a 640 px y se comprimen (~40 KB
   cada una), así que caben de sobra, y en Ajustes ves lo que llevas ocupado. Si
@@ -185,15 +199,9 @@ lo único que pierdes es la nota de consenso. La app tampoco guarda nombres.
 
 ## Lo que falta (siguientes pasos posibles)
 
-1. **Que esté siempre en el móvil sin depender de tu ordenador.** Subirla a un
-   hosting gratis (Netlify, Vercel). Como los datos son locales, sigue sin
-   costar nada. Lo que **no** recomiendo es publicarla en el GitHub Pages que ya
-   tienes: es público y cualquiera con la URL entraría.
-2. **Liga compartida de verdad** (que veas al momento lo que apuntan los otros y
-   voten sin pasarse archivos). Eso sí necesita una base de datos: con Supabase
-   en su plan gratis es un fin de semana de trabajo. Ahí habría que decidir qué
-   se sube: puntos y entradas es directo; las fotos ya significan tenerlas en
-   un servidor y no solo en vuestros móviles, que es otra cosa.
+1. ~~Que esté siempre disponible sin depender de tu ordenador~~ — hecha, está
+   en Netlify.
+2. ~~Liga compartida~~ — hecha. Ver arriba.
 3. Ideas sueltas: rachas, motes/apodos para cada entrada, mapa de sitios,
    histórico de ligas anteriores, exportar la clasificación como imagen para el
    grupo.
