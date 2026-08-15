@@ -50,6 +50,24 @@
     return 'total';
   }
 
+  /** Cuando deja de contar un periodo: el instante en que empieza el siguiente. */
+  function finDePeriodo(periodo, valor) {
+    var d = aFecha(valor);
+    if (periodo === 'dia') {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    }
+    if (periodo === 'semana') {
+      var lunes = inicioSemana(d);
+      return new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 7);
+    }
+    return new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  }
+
+  /** ¿Ya ha terminado ese periodo? Solo entonces se cobra el bonus. */
+  function periodoCerrado(periodo, valor, ahora) {
+    return finDePeriodo(periodo, valor) <= (ahora || new Date());
+  }
+
   /** Dias enteros entre dos fechas (minimo 1, para no dividir por cero). */
   function diasEntre(desde, hasta) {
     var a = new Date(aFecha(desde).getFullYear(), aFecha(desde).getMonth(), aFecha(desde).getDate());
@@ -84,9 +102,49 @@
     return R.notaDeEntrada(votos, entrada.jugadorId, estado.reglas);
   }
 
+  // --- Bonus por ganar dias, semanas y meses --------------------------------
+
+  /**
+   * Puntos extra de cada jugador por los periodos que ha ganado.
+   *
+   * Solo cuentan los periodos ya cerrados. Mientras la semana esta en marcha
+   * el titulo cambia de manos cada noche, y sumar el bonus sobre la marcha
+   * haria que la clasificacion general bailase sin que nadie entienda por que.
+   * En la pestana de Campeones se ve quien lo lleva de momento.
+   *
+   * El campeon se decide solo con los puntos de las entradas: si el bonus
+   * contase para elegir campeon, se estaria premiando a si mismo.
+   */
+  function tablaDeBonus(estado, ahora) {
+    var premios = estado.reglas.bonus || {};
+    var total = {};
+    estado.jugadores.forEach(function (j) { total[j.id] = 0; });
+
+    ['dia', 'semana', 'mes'].forEach(function (periodo) {
+      var premio = Number(premios[periodo]) || 0;
+      if (!premio) return;
+
+      var fechasPorClave = {};
+      estado.entradas.forEach(function (e) {
+        fechasPorClave[clavePeriodo(periodo, e.fecha)] = e.fecha;
+      });
+
+      Object.keys(fechasPorClave).forEach(function (clave) {
+        var fecha = fechasPorClave[clave];
+        if (!periodoCerrado(periodo, fecha, ahora)) return;
+        var campeon = campeonDe(estado, periodo, fecha).campeon;
+        // Sin puntos no hay titulo: una noche de solo rechazos no la gana nadie.
+        if (!campeon || campeon.puntos <= 0) return;
+        total[campeon.jugador.id] = (total[campeon.jugador.id] || 0) + premio;
+      });
+    });
+
+    return total;
+  }
+
   // --- Resumen por jugador --------------------------------------------------
 
-  function resumenJugador(estado, jugador) {
+  function resumenJugador(estado, jugador, bonusPrecalculado) {
     var todas = entradasDe(estado, jugador.id);
     var enLiga = todas.slice(0, estado.reglas.limiteLiga);
     var reglas = estado.reglas;
@@ -120,6 +178,10 @@
 
     var ligadas = porResultado.lio + porResultado.mas_lio;
 
+    var bonus = bonusPrecalculado
+      ? (bonusPrecalculado[jugador.id] || 0)
+      : (tablaDeBonus(estado)[jugador.id] || 0);
+
     return {
       jugador: jugador,
       entradasTotales: todas.length,
@@ -129,7 +191,9 @@
       porResultado: porResultado,
       dentro: dentro,
       fuera: enLiga.length - dentro,
-      puntos: R.redondea(puntos),
+      puntosDeEntradas: R.redondea(puntos),
+      bonus: R.redondea(bonus),
+      puntos: R.redondea(puntos + bonus),
       nota: media === null ? null : R.redondea(media),
       notasContadas: notas.length,
       ritmo: dias ? R.redondea(enLiga.length / dias) : 0,
@@ -152,7 +216,10 @@
   }
 
   function resumenes(estado) {
-    return estado.jugadores.map(function (j) { return resumenJugador(estado, j); });
+    // Una sola pasada de bonus para todos: recorrer semanas y meses por cada
+    // jugador seria hacer el mismo trabajo tantas veces como jugadores haya.
+    var bonus = tablaDeBonus(estado);
+    return estado.jugadores.map(function (j) { return resumenJugador(estado, j, bonus); });
   }
 
   // --- Clasificaciones ------------------------------------------------------
@@ -295,7 +362,12 @@
       .sort()
       .reverse()
       .slice(0, limite || 12)
-      .map(function (k) { return campeonDe(estado, periodo, claves[k]); });
+      .map(function (k) {
+        var resultado = campeonDe(estado, periodo, claves[k]);
+        resultado.fecha = claves[k];
+        resultado.cerrado = periodoCerrado(periodo, claves[k]);
+        return resultado;
+      });
   }
 
   /**
@@ -336,6 +408,9 @@
     claveMes: claveMes,
     clavePeriodo: clavePeriodo,
     inicioSemana: inicioSemana,
+    finDePeriodo: finDePeriodo,
+    periodoCerrado: periodoCerrado,
+    tablaDeBonus: tablaDeBonus,
     diasEntre: diasEntre,
     entradasDe: entradasDe,
     entradasEnLiga: entradasEnLiga,

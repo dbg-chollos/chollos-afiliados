@@ -141,6 +141,11 @@
     var reglas = liga.reglas;
     if (!reglas || typeof reglas !== 'object' || !Object.keys(reglas).length) return;
 
+    // Si la liga se creo antes de que existieran los bonus, normaliza le pone
+    // las reglas de ahora. Quien la creo se encarga de subirlas para que a los
+    // demas les llegue lo mismo y no haya dos tablas distintas.
+    var anticuadas = reglas.bonus === undefined;
+
     var base = D.normaliza({
       jugadores: [], entradas: [], votos: {}, reglas: reglas
     }).reglas;
@@ -148,6 +153,7 @@
     base.modoFoto = estado.reglas.modoFoto;
     base.modoFotoElegido = estado.reglas.modoFotoElegido;
     estado.reglas = base;
+    return anticuadas;
   }
 
   /** ¿Es quien creo la liga? Solo esa persona puede cambiar las reglas. */
@@ -232,7 +238,11 @@
       })
       .then(function () { return N.guardarFilas('votos', misVotos(estado)); })
       .then(function () { return N.miLiga(); })
-      .then(function (liga) { fusionaReglas(estado, liga); })
+      .then(function (liga) {
+        if (fusionaReglas(estado, liga) && soyElJefe(estado)) {
+          return N.guardarReglas(ligaId, estado.reglas).catch(function () { /* al proximo intento */ });
+        }
+      })
       .then(function () { return N.miembros(ligaId); })
       .then(function (filas) { fusionaMiembros(estado, filas || []); })
       .then(function () { return N.entradas(ligaId); })

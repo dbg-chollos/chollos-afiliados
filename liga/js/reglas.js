@@ -77,13 +77,18 @@
       nada: { dentro: 0, fuera: 0 }
     },
 
+    // Puntos extra por ganar un periodo. Se cobran cuando el periodo se cierra,
+    // no mientras va: si no, el total bailaria de un dia para otro.
+    bonus: { dia: 0, semana: 2, mes: 3 },
+
     // Votos minimos (de los demas) para que la nota de una entrada cuente
     // en la media del jugador.
     votosMinimos: 1,
 
     // Peso de cada eje en la clasificacion general. No hace falta que sumen 100,
-    // se normalizan solos.
-    pesos: { puntos: 50, ritmo: 25, nota: 25 }
+    // se normalizan solos. El ritmo pesa poco a proposito: llegar antes a la
+    // cifra es un merito, pero no puede decidir la liga el solo.
+    pesos: { puntos: 40, ritmo: 20, nota: 40 }
   };
 
   // --- Calculo --------------------------------------------------------------

@@ -43,6 +43,10 @@ memoria (o para que otra sesión lo continúe). Actualizar al terminar cada paso
 3. Ideas sueltas que quedaron apuntadas: rachas, mapa de sitios, exportar la
    clasificación como imagen para el grupo, histórico de ligas anteriores.
 
+Reglas vigentes que pidió él: premios de +2 por semana ganada y +3 por mes, y
+pesos de la general 40/20/40 (el ritmo bajó del 25 % al 20 % porque el primero
+en llegar a 100 pesaba demasiado).
+
 Ya hecho por él: base de datos creada y "Confirm email" desactivado.
 
 ## Cosas que no hay que deshacer sin pensarlo

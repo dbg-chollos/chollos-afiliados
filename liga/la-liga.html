@@ -437,6 +437,15 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
 .detalle-caja { background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 10px; padding: 10px; }
 .detalle-caja .k { font-size: .72rem; color: var(--apagado); }
 .detalle-caja .v { font-size: 1.15rem; font-weight: 700; }
+
+.premio-cobrado {
+  background: rgba(255, 178, 36, .15);
+  color: var(--acento-2);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: .74rem;
+  font-weight: 700;
+}
 </style>
 </head>
 <body>
@@ -581,6 +590,16 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
         <input id="aj-dj" type="checkbox">
         <span>Una sala con DJ cuenta como discoteca</span>
       </label>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Premio por ganar</h2>
+      <p class="ayuda">Puntos extra para quien gane cada periodo. Se cobran
+      cuando el periodo termina, no mientras va: si no, la clasificacion
+      bailaria cada noche.</p>
+      <div class="campo-linea"><label for="aj-bonus-dia">Campeon del dia</label><input id="aj-bonus-dia" type="number" min="0" step="0.5"></div>
+      <div class="campo-linea"><label for="aj-bonus-semana">Campeon de la semana</label><input id="aj-bonus-semana" type="number" min="0" step="0.5"></div>
+      <div class="campo-linea"><label for="aj-bonus-mes">Campeon del mes</label><input id="aj-bonus-mes" type="number" min="0" step="0.5"></div>
     </div>
 
     <div class="tarjeta">
@@ -753,13 +772,18 @@ window.ConfigNube = {
       nada: { dentro: 0, fuera: 0 }
     },
 
+    // Puntos extra por ganar un periodo. Se cobran cuando el periodo se cierra,
+    // no mientras va: si no, el total bailaria de un dia para otro.
+    bonus: { dia: 0, semana: 2, mes: 3 },
+
     // Votos minimos (de los demas) para que la nota de una entrada cuente
     // en la media del jugador.
     votosMinimos: 1,
 
     // Peso de cada eje en la clasificacion general. No hace falta que sumen 100,
-    // se normalizan solos.
-    pesos: { puntos: 50, ritmo: 25, nota: 25 }
+    // se normalizan solos. El ritmo pesa poco a proposito: llegar antes a la
+    // cifra es un merito, pero no puede decidir la liga el solo.
+    pesos: { puntos: 40, ritmo: 20, nota: 40 }
   };
 
   // --- Calculo --------------------------------------------------------------
@@ -947,8 +971,14 @@ window.ConfigNube = {
         : defecto.modoFoto,
       modoFotoElegido: !!reglas.modoFotoElegido,
       puntos: Object.assign({}, defecto.puntos, reglas.puntos || {}),
+      bonus: Object.assign({}, defecto.bonus, reglas.bonus || {}),
       votosMinimos: Number(reglas.votosMinimos) > 0 ? Number(reglas.votosMinimos) : defecto.votosMinimos,
-      pesos: Object.assign({}, defecto.pesos, reglas.pesos || {})
+      // Una liga creada antes de que existieran los bonus se queda con los
+      // pesos viejos (ritmo al 25 %), que era justo lo que habia que cambiar.
+      // Se reconoce porque no trae 'bonus', y se le ponen los de ahora.
+      pesos: reglas.bonus === undefined
+        ? Object.assign({}, defecto.pesos)
+        : Object.assign({}, defecto.pesos, reglas.pesos || {})
     };
 
     // Un "yo" que apunta a un jugador borrado deja la app en un limbo raro.
@@ -1210,6 +1240,24 @@ window.ConfigNube = {
     return 'total';
   }
 
+  /** Cuando deja de contar un periodo: el instante en que empieza el siguiente. */
+  function finDePeriodo(periodo, valor) {
+    var d = aFecha(valor);
+    if (periodo === 'dia') {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    }
+    if (periodo === 'semana') {
+      var lunes = inicioSemana(d);
+      return new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 7);
+    }
+    return new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  }
+
+  /** ¿Ya ha terminado ese periodo? Solo entonces se cobra el bonus. */
+  function periodoCerrado(periodo, valor, ahora) {
+    return finDePeriodo(periodo, valor) <= (ahora || new Date());
+  }
+
   /** Dias enteros entre dos fechas (minimo 1, para no dividir por cero). */
   function diasEntre(desde, hasta) {
     var a = new Date(aFecha(desde).getFullYear(), aFecha(desde).getMonth(), aFecha(desde).getDate());
@@ -1244,9 +1292,49 @@ window.ConfigNube = {
     return R.notaDeEntrada(votos, entrada.jugadorId, estado.reglas);
   }
 
+  // --- Bonus por ganar dias, semanas y meses --------------------------------
+
+  /**
+   * Puntos extra de cada jugador por los periodos que ha ganado.
+   *
+   * Solo cuentan los periodos ya cerrados. Mientras la semana esta en marcha
+   * el titulo cambia de manos cada noche, y sumar el bonus sobre la marcha
+   * haria que la clasificacion general bailase sin que nadie entienda por que.
+   * En la pestana de Campeones se ve quien lo lleva de momento.
+   *
+   * El campeon se decide solo con los puntos de las entradas: si el bonus
+   * contase para elegir campeon, se estaria premiando a si mismo.
+   */
+  function tablaDeBonus(estado, ahora) {
+    var premios = estado.reglas.bonus || {};
+    var total = {};
+    estado.jugadores.forEach(function (j) { total[j.id] = 0; });
+
+    ['dia', 'semana', 'mes'].forEach(function (periodo) {
+      var premio = Number(premios[periodo]) || 0;
+      if (!premio) return;
+
+      var fechasPorClave = {};
+      estado.entradas.forEach(function (e) {
+        fechasPorClave[clavePeriodo(periodo, e.fecha)] = e.fecha;
+      });
+
+      Object.keys(fechasPorClave).forEach(function (clave) {
+        var fecha = fechasPorClave[clave];
+        if (!periodoCerrado(periodo, fecha, ahora)) return;
+        var campeon = campeonDe(estado, periodo, fecha).campeon;
+        // Sin puntos no hay titulo: una noche de solo rechazos no la gana nadie.
+        if (!campeon || campeon.puntos <= 0) return;
+        total[campeon.jugador.id] = (total[campeon.jugador.id] || 0) + premio;
+      });
+    });
+
+    return total;
+  }
+
   // --- Resumen por jugador --------------------------------------------------
 
-  function resumenJugador(estado, jugador) {
+  function resumenJugador(estado, jugador, bonusPrecalculado) {
     var todas = entradasDe(estado, jugador.id);
     var enLiga = todas.slice(0, estado.reglas.limiteLiga);
     var reglas = estado.reglas;
@@ -1280,6 +1368,10 @@ window.ConfigNube = {
 
     var ligadas = porResultado.lio + porResultado.mas_lio;
 
+    var bonus = bonusPrecalculado
+      ? (bonusPrecalculado[jugador.id] || 0)
+      : (tablaDeBonus(estado)[jugador.id] || 0);
+
     return {
       jugador: jugador,
       entradasTotales: todas.length,
@@ -1289,7 +1381,9 @@ window.ConfigNube = {
       porResultado: porResultado,
       dentro: dentro,
       fuera: enLiga.length - dentro,
-      puntos: R.redondea(puntos),
+      puntosDeEntradas: R.redondea(puntos),
+      bonus: R.redondea(bonus),
+      puntos: R.redondea(puntos + bonus),
       nota: media === null ? null : R.redondea(media),
       notasContadas: notas.length,
       ritmo: dias ? R.redondea(enLiga.length / dias) : 0,
@@ -1312,7 +1406,10 @@ window.ConfigNube = {
   }
 
   function resumenes(estado) {
-    return estado.jugadores.map(function (j) { return resumenJugador(estado, j); });
+    // Una sola pasada de bonus para todos: recorrer semanas y meses por cada
+    // jugador seria hacer el mismo trabajo tantas veces como jugadores haya.
+    var bonus = tablaDeBonus(estado);
+    return estado.jugadores.map(function (j) { return resumenJugador(estado, j, bonus); });
   }
 
   // --- Clasificaciones ------------------------------------------------------
@@ -1455,7 +1552,12 @@ window.ConfigNube = {
       .sort()
       .reverse()
       .slice(0, limite || 12)
-      .map(function (k) { return campeonDe(estado, periodo, claves[k]); });
+      .map(function (k) {
+        var resultado = campeonDe(estado, periodo, claves[k]);
+        resultado.fecha = claves[k];
+        resultado.cerrado = periodoCerrado(periodo, claves[k]);
+        return resultado;
+      });
   }
 
   /**
@@ -1496,6 +1598,9 @@ window.ConfigNube = {
     claveMes: claveMes,
     clavePeriodo: clavePeriodo,
     inicioSemana: inicioSemana,
+    finDePeriodo: finDePeriodo,
+    periodoCerrado: periodoCerrado,
+    tablaDeBonus: tablaDeBonus,
     diasEntre: diasEntre,
     entradasDe: entradasDe,
     entradasEnLiga: entradasEnLiga,
@@ -2069,6 +2174,11 @@ window.ConfigNube = {
     var reglas = liga.reglas;
     if (!reglas || typeof reglas !== 'object' || !Object.keys(reglas).length) return;
 
+    // Si la liga se creo antes de que existieran los bonus, normaliza le pone
+    // las reglas de ahora. Quien la creo se encarga de subirlas para que a los
+    // demas les llegue lo mismo y no haya dos tablas distintas.
+    var anticuadas = reglas.bonus === undefined;
+
     var base = D.normaliza({
       jugadores: [], entradas: [], votos: {}, reglas: reglas
     }).reglas;
@@ -2076,6 +2186,7 @@ window.ConfigNube = {
     base.modoFoto = estado.reglas.modoFoto;
     base.modoFotoElegido = estado.reglas.modoFotoElegido;
     estado.reglas = base;
+    return anticuadas;
   }
 
   /** ¿Es quien creo la liga? Solo esa persona puede cambiar las reglas. */
@@ -2160,7 +2271,11 @@ window.ConfigNube = {
       })
       .then(function () { return N.guardarFilas('votos', misVotos(estado)); })
       .then(function () { return N.miLiga(); })
-      .then(function (liga) { fusionaReglas(estado, liga); })
+      .then(function (liga) {
+        if (fusionaReglas(estado, liga) && soyElJefe(estado)) {
+          return N.guardarReglas(ligaId, estado.reglas).catch(function () { /* al proximo intento */ });
+        }
+      })
       .then(function () { return N.miembros(ligaId); })
       .then(function (filas) { fusionaMiembros(estado, filas || []); })
       .then(function () { return N.entradas(ligaId); })
@@ -2828,6 +2943,8 @@ window.ConfigNube = {
     var html = '<h2>' + punto(j) + ' ' + esc(j.nombre) + '</h2>' +
       '<div class="detalle-grid">' +
       caja('Puntos', r.puntos) +
+      caja('De entradas', r.puntosDeEntradas) +
+      caja('Premios', r.bonus ? '+' + r.bonus : '0') +
       caja('Entradas', r.entradas + '/' + estado.reglas.limiteLiga) +
       caja('Nota media', r.nota === null ? '—' : r.nota) +
       caja('Entradas/dia', r.ritmo) +
@@ -2960,6 +3077,12 @@ window.ConfigNube = {
   function pintarCampeones() {
     var actual = E.campeonDe(estado, periodoActual, new Date());
     var titulo = { dia: 'Campeon de hoy', semana: 'Campeon de esta semana', mes: 'Campeon de este mes' }[periodoActual];
+    var premio = Number((estado.reglas.bonus || {})[periodoActual]) || 0;
+    // El periodo en curso no esta decidido: se avisa de que va provisional.
+    var enJuego = premio
+      ? '<div class="detalle" style="color:#ffb224">Se lleva +' + premio +
+        ' pts cuando termine. Todavia puede cambiar.</div>'
+      : '';
 
     if (actual.campeon) {
       $('#campeon-actual').innerHTML = '<div class="podio">' +
@@ -2968,6 +3091,7 @@ window.ConfigNube = {
         '<div class="detalle">' + esc(titulo) + ' · ' + actual.campeon.puntos + ' pts · ' +
         actual.campeon.entradas + ' entradas' +
         (actual.campeon.nota !== null ? ' · nota ' + actual.campeon.nota : '') + '</div>' +
+        enJuego +
         '</div>' +
         '<div class="tarjeta"><h2>Ahora mismo</h2><table class="tabla"><tbody>' +
         actual.tabla.map(function (a, i) {
@@ -2978,7 +3102,9 @@ window.ConfigNube = {
         }).join('') + '</tbody></table></div>';
     } else {
       $('#campeon-actual').innerHTML = '<div class="tarjeta"><div class="vacio">' +
-        'Sin entradas en este periodo todavia. El titulo esta libre.</div></div>';
+        'Sin entradas en este periodo todavia. El titulo esta libre' +
+        (premio ? ', y con el +' + premio + ' pts para quien lo gane.' : '.') +
+        '</div></div>';
     }
 
     var historial = E.historialCampeones(estado, periodoActual, 12);
@@ -2988,7 +3114,10 @@ window.ConfigNube = {
         return '<div class="periodo-bloque">' +
           '<div class="fecha">' + esc(etiquetaPeriodo(h.periodo, h.clave)) + '</div>' +
           '<div class="linea">' + punto(h.campeon.jugador) + '<strong>' + esc(h.campeon.jugador.nombre) + '</strong>' +
-          '<span class="apagado">' + h.campeon.puntos + ' pts · ' + h.campeon.entradas + ' entradas</span></div>' +
+          '<span class="apagado">' + h.campeon.puntos + ' pts · ' + h.campeon.entradas + ' entradas</span>' +
+          (premio && E.periodoCerrado(h.periodo, h.fecha)
+            ? '<span class="premio-cobrado">+' + premio + '</span>' : '') +
+          '</div>' +
           '</div>';
       }).join('')
       : '<div class="vacio">Sin historial todavia</div>';
@@ -3217,6 +3346,9 @@ window.ConfigNube = {
     $('#aj-peso-ritmo').value = estado.reglas.pesos.ritmo;
     $('#aj-peso-nota').value = estado.reglas.pesos.nota;
     $('#aj-votos-min').value = estado.reglas.votosMinimos;
+    $('#aj-bonus-dia').value = estado.reglas.bonus.dia;
+    $('#aj-bonus-semana').value = estado.reglas.bonus.semana;
+    $('#aj-bonus-mes').value = estado.reglas.bonus.mes;
 
     $('#aj-jugadores').innerHTML = estado.jugadores.map(function (j) {
       var r = E.resumenJugador(estado, j);
@@ -3255,7 +3387,8 @@ window.ConfigNube = {
     // movil y las clasificaciones no cuadrarian.
     var mando = mandoSobreReglas();
     $$('#aj-tabla-puntos input, #aj-limite, #aj-dj, #aj-peso-puntos, #aj-peso-ritmo, ' +
-      '#aj-peso-nota, #aj-votos-min').forEach(function (campo) {
+      '#aj-peso-nota, #aj-votos-min, #aj-bonus-dia, #aj-bonus-semana, ' +
+      '#aj-bonus-mes').forEach(function (campo) {
       campo.disabled = !mando;
     });
     var nota = $('#aj-reglas-bloqueadas');
@@ -3362,6 +3495,17 @@ window.ConfigNube = {
         publicarReglas();
       });
     });
+
+    [['#aj-bonus-dia', 'dia'], ['#aj-bonus-semana', 'semana'], ['#aj-bonus-mes', 'mes']]
+      .forEach(function (par) {
+        $(par[0]).addEventListener('change', function () {
+          estado.reglas.bonus[par[1]] = Math.max(0, Number(this.value) || 0);
+          this.value = estado.reglas.bonus[par[1]];
+          persistir();
+          publicarReglas();
+          pintarCabecera();
+        });
+      });
 
     $('#aj-votos-min').addEventListener('change', function () {
       estado.reglas.votosMinimos = Math.max(1, Math.round(Number(this.value) || 1));

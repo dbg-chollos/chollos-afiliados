@@ -627,6 +627,8 @@
     var html = '<h2>' + punto(j) + ' ' + esc(j.nombre) + '</h2>' +
       '<div class="detalle-grid">' +
       caja('Puntos', r.puntos) +
+      caja('De entradas', r.puntosDeEntradas) +
+      caja('Premios', r.bonus ? '+' + r.bonus : '0') +
       caja('Entradas', r.entradas + '/' + estado.reglas.limiteLiga) +
       caja('Nota media', r.nota === null ? '—' : r.nota) +
       caja('Entradas/dia', r.ritmo) +
@@ -759,6 +761,12 @@
   function pintarCampeones() {
     var actual = E.campeonDe(estado, periodoActual, new Date());
     var titulo = { dia: 'Campeon de hoy', semana: 'Campeon de esta semana', mes: 'Campeon de este mes' }[periodoActual];
+    var premio = Number((estado.reglas.bonus || {})[periodoActual]) || 0;
+    // El periodo en curso no esta decidido: se avisa de que va provisional.
+    var enJuego = premio
+      ? '<div class="detalle" style="color:#ffb224">Se lleva +' + premio +
+        ' pts cuando termine. Todavia puede cambiar.</div>'
+      : '';
 
     if (actual.campeon) {
       $('#campeon-actual').innerHTML = '<div class="podio">' +
@@ -767,6 +775,7 @@
         '<div class="detalle">' + esc(titulo) + ' · ' + actual.campeon.puntos + ' pts · ' +
         actual.campeon.entradas + ' entradas' +
         (actual.campeon.nota !== null ? ' · nota ' + actual.campeon.nota : '') + '</div>' +
+        enJuego +
         '</div>' +
         '<div class="tarjeta"><h2>Ahora mismo</h2><table class="tabla"><tbody>' +
         actual.tabla.map(function (a, i) {
@@ -777,7 +786,9 @@
         }).join('') + '</tbody></table></div>';
     } else {
       $('#campeon-actual').innerHTML = '<div class="tarjeta"><div class="vacio">' +
-        'Sin entradas en este periodo todavia. El titulo esta libre.</div></div>';
+        'Sin entradas en este periodo todavia. El titulo esta libre' +
+        (premio ? ', y con el +' + premio + ' pts para quien lo gane.' : '.') +
+        '</div></div>';
     }
 
     var historial = E.historialCampeones(estado, periodoActual, 12);
@@ -787,7 +798,10 @@
         return '<div class="periodo-bloque">' +
           '<div class="fecha">' + esc(etiquetaPeriodo(h.periodo, h.clave)) + '</div>' +
           '<div class="linea">' + punto(h.campeon.jugador) + '<strong>' + esc(h.campeon.jugador.nombre) + '</strong>' +
-          '<span class="apagado">' + h.campeon.puntos + ' pts · ' + h.campeon.entradas + ' entradas</span></div>' +
+          '<span class="apagado">' + h.campeon.puntos + ' pts · ' + h.campeon.entradas + ' entradas</span>' +
+          (premio && E.periodoCerrado(h.periodo, h.fecha)
+            ? '<span class="premio-cobrado">+' + premio + '</span>' : '') +
+          '</div>' +
           '</div>';
       }).join('')
       : '<div class="vacio">Sin historial todavia</div>';
@@ -1016,6 +1030,9 @@
     $('#aj-peso-ritmo').value = estado.reglas.pesos.ritmo;
     $('#aj-peso-nota').value = estado.reglas.pesos.nota;
     $('#aj-votos-min').value = estado.reglas.votosMinimos;
+    $('#aj-bonus-dia').value = estado.reglas.bonus.dia;
+    $('#aj-bonus-semana').value = estado.reglas.bonus.semana;
+    $('#aj-bonus-mes').value = estado.reglas.bonus.mes;
 
     $('#aj-jugadores').innerHTML = estado.jugadores.map(function (j) {
       var r = E.resumenJugador(estado, j);
@@ -1054,7 +1071,8 @@
     // movil y las clasificaciones no cuadrarian.
     var mando = mandoSobreReglas();
     $$('#aj-tabla-puntos input, #aj-limite, #aj-dj, #aj-peso-puntos, #aj-peso-ritmo, ' +
-      '#aj-peso-nota, #aj-votos-min').forEach(function (campo) {
+      '#aj-peso-nota, #aj-votos-min, #aj-bonus-dia, #aj-bonus-semana, ' +
+      '#aj-bonus-mes').forEach(function (campo) {
       campo.disabled = !mando;
     });
     var nota = $('#aj-reglas-bloqueadas');
@@ -1161,6 +1179,17 @@
         publicarReglas();
       });
     });
+
+    [['#aj-bonus-dia', 'dia'], ['#aj-bonus-semana', 'semana'], ['#aj-bonus-mes', 'mes']]
+      .forEach(function (par) {
+        $(par[0]).addEventListener('change', function () {
+          estado.reglas.bonus[par[1]] = Math.max(0, Number(this.value) || 0);
+          this.value = estado.reglas.bonus[par[1]];
+          persistir();
+          publicarReglas();
+          pintarCabecera();
+        });
+      });
 
     $('#aj-votos-min').addEventListener('change', function () {
       estado.reglas.votosMinimos = Math.max(1, Math.round(Number(this.value) || 1));

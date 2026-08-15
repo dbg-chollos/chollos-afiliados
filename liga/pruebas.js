@@ -128,7 +128,7 @@ function estadoDemo() {
   return {
     version: 1,
     liga: { nombre: 'Test', creada: '2026-08-01T00:00:00.000Z' },
-    reglas: reglas({ limiteLiga: 3 }),
+    reglas: reglas({ limiteLiga: 3, bonus: { dia: 0, semana: 0, mes: 0 } }),
     jugadores: [
       { id: 'a', nombre: 'Ana', color: '#f00' },
       { id: 'b', nombre: 'Bruno', color: '#00f' }
@@ -218,6 +218,57 @@ comprueba('con el limite en 2, la liga termina y gana el del mejor indice',
   [E.estadoLiga(terminada).terminada, E.estadoLiga(terminada).campeon.jugador.id],
   [true, 'a']);
 
+console.log('\nPremios por ganar periodos');
+
+function estadoConFechas(fechas) {
+  var demo = estadoDemo();
+  demo.reglas.limiteLiga = 100;
+  demo.reglas.bonus = { dia: 0, semana: 2, mes: 3 };
+  demo.entradas = fechas.map(function (f, i) {
+    return entrada({
+      id: 'p' + i, jugadorId: f.de, fecha: f.cuando, resultado: f.resultado || 'mas_lio'
+    });
+  });
+  demo.votos = {};
+  return demo;
+}
+
+// Semana del 3 al 9 de agosto de 2026 (lunes a domingo), ya cerrada el dia 20.
+var cerrada = estadoConFechas([
+  { de: 'a', cuando: '2026-08-04T22:00:00' },
+  { de: 'b', cuando: '2026-08-05T22:00:00', resultado: 'amigos' }
+]);
+// Ya cerrados la semana (3-9 ago) y el mes de agosto.
+var ahora = new Date('2026-09-20T12:00:00');
+
+comprueba('el que gana una semana cerrada cobra su premio',
+  E.tablaDeBonus(cerrada, ahora).a, 2 + 3);
+
+comprueba('el segundo no cobra nada',
+  E.tablaDeBonus(cerrada, ahora).b, 0);
+
+comprueba('una semana sin cerrar todavia no paga',
+  E.tablaDeBonus(cerrada, new Date('2026-08-06T12:00:00')).a, 0);
+
+comprueba('con la semana cerrada pero el mes en marcha, solo cobra la semana',
+  E.tablaDeBonus(cerrada, new Date('2026-08-20T12:00:00')).a, 2);
+
+comprueba('los puntos del jugador incluyen el premio',
+  E.resumenJugador(cerrada, cerrada.jugadores[0], E.tablaDeBonus(cerrada, ahora)).puntos, 15);
+
+comprueba('y se puede ver el desglose',
+  [E.resumenJugador(cerrada, cerrada.jugadores[0], E.tablaDeBonus(cerrada, ahora)).puntosDeEntradas,
+   E.resumenJugador(cerrada, cerrada.jugadores[0], E.tablaDeBonus(cerrada, ahora)).bonus],
+  [10, 5]);
+
+comprueba('el premio no decide quien es campeon (si no, se premiaria solo)',
+  E.campeonDe(cerrada, 'semana', '2026-08-04T22:00:00').campeon.puntos, 10);
+
+var sinPremios = estadoConFechas([{ de: 'a', cuando: '2026-08-04T22:00:00' }]);
+sinPremios.reglas.bonus = { dia: 0, semana: 0, mes: 0 };
+comprueba('con los premios a cero no se suma nada',
+  E.tablaDeBonus(sinPremios, ahora).a, 0);
+
 console.log('\nSemanas y meses');
 
 comprueba('la semana empieza en lunes',
@@ -246,6 +297,17 @@ comprueba('tambien se respeta cuando eligieron el mismo que trae por defecto',
 
 comprueba('un modo inventado no cuela ni eligiendolo a mano',
   normalizada({ modoFoto: 'loquesea', modoFotoElegido: true }).modoFoto, R.REGLAS_DEFECTO.modoFoto);
+
+comprueba('una liga de antes de los premios se pasa a los pesos nuevos',
+  normalizada({ pesos: { puntos: 50, ritmo: 25, nota: 25 } }).pesos,
+  R.REGLAS_DEFECTO.pesos);
+
+comprueba('una liga que ya conoce los premios conserva sus pesos',
+  normalizada({ bonus: { dia: 0, semana: 2, mes: 3 }, pesos: { puntos: 10, ritmo: 10, nota: 80 } }).pesos,
+  { puntos: 10, ritmo: 10, nota: 80 });
+
+comprueba('el ritmo ya no decide la liga: pesa un 20 %',
+  R.REGLAS_DEFECTO.pesos, { puntos: 40, ritmo: 20, nota: 40 });
 
 comprueba('el resto de ajustes suyos no se tocan',
   [normalizada({ limiteLiga: 50, votosMinimos: 3 }).limiteLiga,

@@ -111,9 +111,11 @@ La app calcula cuatro tablas:
 - **Nota** — media de lo que los demás han puntuado a sus fotos (del 1 al 10).
   Nadie se vota a sí mismo y el propio voto nunca cuenta en su media.
 - **General** — mezcla de las tres. Cada eje se convierte a 0–100 comparándolo
-  con el mejor de la liga y se suman con pesos (por defecto 50 % puntos,
-  25 % ritmo, 25 % nota, editable en Ajustes). Tocando un jugador ves el
-  desglose, para que nadie discuta la tabla sin datos.
+  con el mejor de la liga y se suman con pesos: por defecto **40 % puntos,
+  20 % ritmo y 40 % nota**, editables en Ajustes. El ritmo pesa poco a
+  propósito: llegar antes a la cifra es un mérito, pero no puede decidir la liga
+  él solo. Tocando un jugador ves el desglose, para que nadie discuta la tabla
+  sin datos.
 
 **La liga acaba cuando *todos* llegan a 100.** Si tú llegas antes, puedes seguir
 apuntando: se guarda y se ve en tu historial marcado como *fuera de liga*, pero
@@ -123,6 +125,16 @@ cambia en Ajustes.
 **Campeones**: día, semana (de lunes a domingo) y mes se calculan por puntos
 hechos dentro de ese periodo, con el historial de los últimos 12. Empate a
 puntos → más entradas → mejor nota.
+
+Ganar un periodo da **puntos extra**: por defecto +2 la semana y +3 el mes
+(el día no da nada; los tres se cambian en Ajustes). Se cobran **cuando el
+periodo termina**, no mientras va: si contaran sobre la marcha, la clasificación
+cambiaría cada noche según quién fuera ganando la semana en ese momento. En la
+pestaña de Campeones se ve quién lo lleva de momento y qué se juega.
+
+El campeón se decide **solo con los puntos de las entradas**. Si los premios
+contaran para elegir campeón, quien ganó una semana tendría ventaja para ganar
+la siguiente por haberla ganado.
 
 ---
 

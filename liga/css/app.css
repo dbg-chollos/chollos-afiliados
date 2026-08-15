@@ -426,3 +426,12 @@ input:focus, select:focus { outline: 2px solid var(--acento); outline-offset: 1p
 .detalle-caja { background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 10px; padding: 10px; }
 .detalle-caja .k { font-size: .72rem; color: var(--apagado); }
 .detalle-caja .v { font-size: 1.15rem; font-weight: 700; }
+
+.premio-cobrado {
+  background: rgba(255, 178, 36, .15);
+  color: var(--acento-2);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: .74rem;
+  font-weight: 700;
+}

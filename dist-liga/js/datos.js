@@ -92,8 +92,14 @@
         : defecto.modoFoto,
       modoFotoElegido: !!reglas.modoFotoElegido,
       puntos: Object.assign({}, defecto.puntos, reglas.puntos || {}),
+      bonus: Object.assign({}, defecto.bonus, reglas.bonus || {}),
       votosMinimos: Number(reglas.votosMinimos) > 0 ? Number(reglas.votosMinimos) : defecto.votosMinimos,
-      pesos: Object.assign({}, defecto.pesos, reglas.pesos || {})
+      // Una liga creada antes de que existieran los bonus se queda con los
+      // pesos viejos (ritmo al 25 %), que era justo lo que habia que cambiar.
+      // Se reconoce porque no trae 'bonus', y se le ponen los de ahora.
+      pesos: reglas.bonus === undefined
+        ? Object.assign({}, defecto.pesos)
+        : Object.assign({}, defecto.pesos, reglas.pesos || {})
     };
 
     // Un "yo" que apunta a un jugador borrado deja la app en un limbo raro.
