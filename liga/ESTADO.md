@@ -16,8 +16,10 @@ memoria (o para que otra sesión lo continúe). Actualizar al terminar cada paso
   firme: su familia entra en la web de ofertas. `docs/` no contiene ni una
   línea de la app, y `scripts/comprobar_separacion.py` lo verifica en cada
   build y en el workflow diario. Si algo se cuela, el despliegue falla.
-- **Publicación propia** preparada: `dist-liga/` (ya construida en el repo) y
-  `netlify.toml`. Pendiente de que él conecte Netlify.
+- **Publicada** en <https://liga-de-los-pavos.netlify.app> (Netlify, gratis,
+  desde la rama `claude/liga-ligues-app-xnp8da`, publicando `dist-liga/`).
+  **Al tocar la app hay que regenerar esa carpeta** con
+  `python scripts/preparar_web_liga.py` y hacer push, o el sitio no cambia.
 - **Base de datos en Supabase**: creada y verificada por él con el esquema de
   `liga/supabase/esquema.sql` → 4 tablas, 12 políticas, bucket de fotos y sus
   3 políticas. Proyecto `arfiuoxsqgcnkwtalcwn`.

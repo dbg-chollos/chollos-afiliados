@@ -13,9 +13,13 @@ en el navegador del móvil que la usa**. Coste 0€, igual que el resto del repo
 **Opción rápida (probarla en el ordenador):** doble clic en `liga/index.html`.
 Funciona todo menos instalarla como app.
 
-**Opción buena (cada uno en su móvil, sin depender de nadie):** publicarla en su
-propio alojamiento, **con su propio dominio, sin ninguna relación con el sitio
-de ofertas**. Está preparado para Netlify (gratis):
+**Publicada y en marcha:** <https://liga-de-los-pavos.netlify.app>
+
+Ese es el enlace que se pasa a los amigos, junto con el código de la liga. Está
+en Netlify, en su propio dominio, **sin ninguna relación con el sitio de
+ofertas**, y con `noindex`: no aparece en ningún buscador.
+
+Cómo está montado, por si hay que rehacerlo:
 
 - `dist-liga/` es lo que se sirve: lo justo para que funcione (sin README, sin
   pruebas, sin el SQL). Va ya construida en el repo, así que el despliegue no
