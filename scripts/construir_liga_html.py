@@ -45,9 +45,11 @@ def inserta_recursos(html: str) -> str:
     html = re.sub(r'<script src="([^"]+)"></script>', mete_js, html)
 
     # El icono, metido como data URI para no depender de ningun archivo suelto.
-    icono = leer(LIGA / "icono.svg").encode("utf-8")
-    data_uri = "data:image/svg+xml;base64," + base64.b64encode(icono).decode("ascii")
-    html = html.replace('href="icono.svg"', f'href="{data_uri}"')
+    # Se usa el de 180 para los dos: el de 512 pesaria medio mega el solo.
+    icono = (LIGA / "icono-180.png").read_bytes()
+    data_uri = "data:image/png;base64," + base64.b64encode(icono).decode("ascii")
+    for suelto in ("icono-180.png", "icono-192.png"):
+        html = html.replace(f'href="{suelto}"', f'href="{data_uri}"')
 
     # El manifiesto y el service worker necesitan archivos aparte servidos por
     # http, asi que en la version de un solo archivo no pintan nada.

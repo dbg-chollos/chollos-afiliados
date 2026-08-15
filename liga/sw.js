@@ -3,16 +3,23 @@
  * manana el 4G va regular). Los datos ya viven en el navegador, esto solo
  * guarda los archivos de la app.
  */
-var CACHE = 'liga-v1';
+var CACHE = 'liga-v2';
 var ARCHIVOS = [
   './',
   './index.html',
   './css/app.css',
+  // Todos los del index, en el mismo orden. Si falta alguno, sin cobertura la
+  // app carga a medias y falla en cuanto toca esa parte.
+  './js/config.js',
   './js/reglas.js',
   './js/datos.js',
   './js/estadisticas.js',
+  './js/nube.js',
+  './js/sincro.js',
   './js/app.js',
-  './icono.svg',
+  './icono-180.png',
+  './icono-192.png',
+  './icono-512.png',
   './manifest.webmanifest'
 ];
 

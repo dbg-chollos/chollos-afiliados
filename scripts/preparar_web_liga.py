@@ -24,7 +24,9 @@ SALIDA = RAIZ / "dist-liga"
 # Lo que se sube. Cualquier cosa que no este aqui, no viaja.
 CONTENIDO = [
     "index.html",
-    "icono.svg",
+    "icono-180.png",
+    "icono-192.png",
+    "icono-512.png",
     "manifest.webmanifest",
     "sw.js",
     "css",
