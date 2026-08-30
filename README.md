@@ -116,3 +116,10 @@ natural para mejorar el SEO, puedes activar el enriquecido con IA:
 Ningun ingreso esta garantizado. El trafico de un sitio nuevo tarda meses en
 crecer con SEO, y no todo el que hace clic compra. Ver `PROYECCION.md` para
 una estimacion realista mes a mes, con sus supuestos explicitos.
+
+## Extra: tono de llamada personalizado en el movil
+
+Fuera del pipeline del sitio, el repo incluye `scripts/tono_llamada.py`, que convierte
+un trozo de cualquier video o audio local en un tono de llamada para iPhone (`.m4r`) o
+Android (`.mp3`). Los pasos completos, incluido como hacer que suene tambien en las
+llamadas de WhatsApp, estan en `TONO_LLAMADA.md`.
