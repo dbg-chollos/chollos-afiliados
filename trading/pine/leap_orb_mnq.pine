@@ -1,0 +1,280 @@
+//@version=6
+// =============================================================================
+// ORB para The Leap - ruptura del rango de apertura con dimensionamiento de torneo
+// =============================================================================
+//
+// Misma logica que trading/sim/orb_backtest.py, para que el backtest de Python y
+// el de TradingView hablen del mismo sistema. Pensado para MNQ1!/MES1! en 5 min.
+//
+// Lo que lo diferencia de un ORB cualquiera es el modo de dimensionamiento
+// "torneo": el tamano de la posicion no es un riesgo fijo, sino el apalancamiento
+// que maximiza la probabilidad de alcanzar un objetivo antes de una fecha limite:
+//
+//     L* = sqrt(2 * ln(objetivo / multiplo_actual)) / (sigma * sqrt(T))
+//
+// Recalculado en cada operacion con el hueco que queda y el tiempo que queda. Si
+// vas por detras se vuelve agresivo; si ya has superado el objetivo, se pone a la
+// defensiva para proteger el puesto. La derivacion esta en PLAN_TORNEO.md.
+//
+// ADVERTENCIA: esto asume varianza alta a proposito porque en un concurso perder
+// la cuenta de papel no cuesta nada. NO uses este dimensionamiento con dinero
+// real: la probabilidad de ruina es enorme y en una cuenta real la ruina es
+// permanente.
+
+strategy("Leap ORB - MNQ", overlay = true, calc_on_every_tick = false,
+     process_orders_on_close = true, initial_capital = 100000,
+     default_qty_type = strategy.fixed, default_qty_value = 1,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 0.52,
+     slippage = 1, pyramiding = 0)
+
+// --- Sesiones -----------------------------------------------------------------
+grpS = "Sesiones (hora de Nueva York)"
+tz            = "America/New_York"
+// Rango de 30 min por defecto, no de 15. No es porque gane mas: es que un stop
+// de ~0,30% (rango de 15 min) topa el riesgo en el 13,7% por el limite de margen,
+// mientras que ~0,60% (rango de 30 min) permite llegar al 27%. Con solo 5 o 6
+// operaciones en todo el concurso, ese es el rango de riesgo que hace falta.
+orSession     = input.session("0930-1000", "Rango de apertura",        group = grpS)
+entrySession  = input.session("0945-1200", "Ventana de entradas",      group = grpS)
+flatSession   = input.session("1550-1600", "Cierre forzoso",           group = grpS)
+
+// --- Senal --------------------------------------------------------------------
+grpE = "Entrada y salida"
+bufferTicks   = input.int(2,    "Colchon sobre el rango (ticks)", minval = 0, group = grpE)
+stopMode      = input.string("Rango opuesto", "Stop de perdidas",
+                 options = ["Rango opuesto", "ATR"], group = grpE)
+atrStopMult   = input.float(1.0, "Multiplo de ATR para el stop", minval = 0.1, group = grpE)
+targetR       = input.float(2.0, "Objetivo en multiplos de R", minval = 0.5, group = grpE)
+useTrail      = input.bool(false, "Trailing en vez de objetivo fijo", group = grpE)
+trailAfterR   = input.float(1.0, "Activar trailing a partir de R", minval = 0.1, group = grpE)
+trailAtrMult  = input.float(1.5, "Multiplo de ATR del trailing", minval = 0.1, group = grpE)
+maxTrades     = input.int(1,    "Maximo de operaciones por sesion", minval = 1, group = grpE)
+longOnly      = input.bool(false, "Solo largos", group = grpE)
+
+// --- Filtro de calidad del rango ---------------------------------------------
+grpF = "Filtro"
+atrLen        = input.int(14,   "Periodos del ATR diario", minval = 2, group = grpF)
+minOrAtr      = input.float(0.15, "Rango minimo (x ATR)", minval = 0.0, group = grpF)
+maxOrAtr      = input.float(1.20, "Rango maximo (x ATR)", minval = 0.1, group = grpF)
+
+// --- Dimensionamiento ---------------------------------------------------------
+grpR = "Dimensionamiento"
+sizeMode      = input.string("Torneo (L* dinamico)", "Modo",
+                 options = ["Riesgo fijo", "Torneo (L* dinamico)"], group = grpR)
+riskPct       = input.float(1.0, "Riesgo por operacion (%)", minval = 0.01, step = 0.1,
+                 tooltip = "Solo en modo 'Riesgo fijo'.", group = grpR)
+targetMult    = input.float(6.0, "Objetivo de cuenta (multiplo)", minval = 1.1, step = 0.5,
+                 tooltip = "6 = acabar el concurso con x6 la cuenta inicial.", group = grpR)
+sigmaAnnual   = input.float(0.20, "Volatilidad anual del subyacente", minval = 0.01,
+                 step = 0.01, group = grpR)
+contestEnd    = input.time(timestamp("2026-08-14T08:00:00+00:00"), "Fin del concurso",
+                 group = grpR)
+protectRisk   = input.float(0.5, "Riesgo (%) una vez alcanzado el objetivo", minval = 0.0,
+                 step = 0.1, group = grpR)
+maxRiskPct    = input.float(15.0, "Tope de riesgo por operacion (%)", minval = 0.1,
+                 group = grpR)
+marginPerCon  = input.float(2500.0, "Margen por contrato ($)", minval = 1.0,
+                 tooltip = "Comprueba el valor real en las especificaciones del contrato.",
+                 group = grpR)
+maxDailyLoss  = input.float(0.0, "Parada por perdida diaria (%, 0 = sin limite)",
+                 minval = 0.0, group = grpR)
+
+grpQ = "Cualificacion"
+forceQualify  = input.bool(true, "Operar 1 contrato si el filtro rechaza el dia",
+                 tooltip = "El concurso exige un minimo de sesiones operadas. Un premio al " +
+                 "que no optas vale cero, por buena que sea la rentabilidad. Esta opcion " +
+                 "registra la sesion con una operacion simbolica cuando no hay setup valido.",
+                 group = grpQ)
+
+// =============================================================================
+// Estado
+// =============================================================================
+
+inOR    = not na(time(timeframe.period, orSession,    tz))
+inEntry = not na(time(timeframe.period, entrySession, tz))
+inFlat  = not na(time(timeframe.period, flatSession,  tz))
+
+// ATR diario CERRADO. El [1] es imprescindible: el ATR que incluye la sesion en
+// curso filtraria las sesiones sabiendo ya como acaban.
+atrDaily = request.security(syminfo.tickerid, "D", ta.atr(atrLen)[1],
+             lookahead = barmerge.lookahead_off)
+
+var float orHigh    = na
+var float orLow     = na
+var bool  orReady   = false
+var int   tradesDay = 0
+var float dayStartEq = na
+var bool  dayBlocked = false
+
+newDay = inOR and not inOR[1]
+
+if newDay
+    orHigh     := high
+    orLow      := low
+    orReady    := false
+    tradesDay  := 0
+    dayStartEq := strategy.equity
+    dayBlocked := false
+else if inOR
+    orHigh := math.max(orHigh, high)
+    orLow  := math.min(orLow,  low)
+
+// El rango queda fijado en la primera barra posterior a la ventana de apertura.
+if not inOR and inOR[1]
+    orReady := true
+
+// Freno de mano por perdida diaria: evita que una sesion mala se convierta en
+// cero, que a efectos de clasificacion es lo unico irreversible.
+if maxDailyLoss > 0 and not na(dayStartEq) and
+   strategy.equity < dayStartEq * (1.0 - maxDailyLoss / 100.0)
+    dayBlocked := true
+
+// =============================================================================
+// Dimensionamiento
+// =============================================================================
+
+// Sesiones habiles que quedan hasta el cierre del concurso (aproximacion 5/7).
+msLeft   = math.max(contestEnd - time, 0)
+daysLeft = math.max(msLeft / 86400000.0 * 5.0 / 7.0, 0.5)
+
+equityMult = strategy.equity / strategy.initial_capital
+
+// L* = sqrt(2 ln(objetivo/actual)) / (sigma sqrt(T)). No depende de tu edge: el
+// edge cambia la probabilidad que consigues, no lo agresivo que te conviene ser.
+gap   = math.max(targetMult / math.max(equityMult, 0.01), 1.0000001)
+horiz = daysLeft / 252.0
+lStar = math.sqrt(2.0 * math.log(gap)) / (sigmaAnnual * math.sqrt(horiz))
+
+// Convierte L* en riesgo por operacion usando la distancia real del stop de
+// ESTA operacion: riesgo = L* x (stop / precio).
+f_riskFraction(float stopPoints) =>
+    float frac = 0.0
+    if sizeMode == "Riesgo fijo"
+        frac := riskPct / 100.0
+    else if equityMult >= targetMult
+        frac := protectRisk / 100.0          // objetivo cumplido: proteger puesto
+    else
+        frac := lStar * (stopPoints / close)
+    math.min(frac, maxRiskPct / 100.0)
+
+f_qty(float stopPoints) =>
+    float frac    = f_riskFraction(stopPoints)
+    float riskCash = strategy.equity * frac
+    float perCon   = stopPoints * syminfo.pointvalue
+    int   q        = perCon > 0 ? int(math.floor(riskCash / perCon)) : 0
+    // El margen es un techo duro: no puedes sostener mas contratos que
+    // equity/margen por mucho que la formula los pida.
+    int   qMargin  = int(math.floor(strategy.equity / marginPerCon))
+    math.max(math.min(q, qMargin), 0)
+
+// =============================================================================
+// Logica de entrada
+// =============================================================================
+
+tickBuf     = bufferTicks * syminfo.mintick
+longTrigger  = orHigh + tickBuf
+shortTrigger = orLow  - tickBuf
+orRange      = orHigh - orLow
+
+rangeOk = orReady and not na(atrDaily) and atrDaily > 0 and orRange > 0 and
+          orRange >= minOrAtr * atrDaily and orRange <= maxOrAtr * atrDaily
+
+// Operacion simbolica de cualificacion: el filtro rechaza aproximadamente la
+// mitad de las sesiones, asi que en 11 sesiones puedes quedarte por debajo de
+// las 5 exigidas. Un contrato registra la sesion a coste practicamente nulo.
+tokenTrade = forceQualify and orReady and not rangeOk and orRange > 0 and
+             not na(atrDaily) and atrDaily > 0
+
+canTrade = (rangeOk or tokenTrade) and inEntry and not inFlat and not dayBlocked and
+           tradesDay < maxTrades and strategy.position_size == 0
+
+longStop  = stopMode == "ATR" ? longTrigger  - atrStopMult * atrDaily : orLow  - tickBuf
+shortStop = stopMode == "ATR" ? shortTrigger + atrStopMult * atrDaily : orHigh + tickBuf
+
+longRisk  = longTrigger  - longStop
+shortRisk = shortStop - shortTrigger
+
+if canTrade and longRisk > 0
+    int q = tokenTrade ? 1 : f_qty(longRisk)
+    if q > 0
+        strategy.entry("L", strategy.long, qty = q, stop = longTrigger,
+             comment = tokenTrade ? "cualificacion" : "ORB alza")
+
+if canTrade and not longOnly and shortRisk > 0
+    int q = tokenTrade ? 1 : f_qty(shortRisk)
+    if q > 0
+        strategy.entry("S", strategy.short, qty = q, stop = shortTrigger,
+             comment = tokenTrade ? "cualificacion" : "ORB baja")
+
+// Cuenta la operacion cuando realmente se abre la posicion.
+if strategy.position_size != 0 and strategy.position_size[1] == 0
+    tradesDay += 1
+    // La orden contraria ya no interesa: se opera la primera ruptura del dia.
+    strategy.cancel(strategy.position_size > 0 ? "S" : "L")
+
+// =============================================================================
+// Gestion de la posicion
+// =============================================================================
+
+var float entryStop = na
+if strategy.position_size != 0 and strategy.position_size[1] == 0
+    entryStop := strategy.position_size > 0 ? longStop : shortStop
+
+if strategy.position_size > 0
+    float risk   = strategy.position_avg_price - entryStop
+    float target = strategy.position_avg_price + targetR * risk
+    if useTrail
+        float trailOffset = trailAtrMult * atrDaily
+        strategy.exit("salida L", from_entry = "L", stop = entryStop,
+             trail_points = trailAfterR * risk / syminfo.mintick,
+             trail_offset = trailOffset / syminfo.mintick)
+    else
+        strategy.exit("salida L", from_entry = "L", stop = entryStop, limit = target)
+
+if strategy.position_size < 0
+    float risk   = entryStop - strategy.position_avg_price
+    float target = strategy.position_avg_price - targetR * risk
+    if useTrail
+        float trailOffset = trailAtrMult * atrDaily
+        strategy.exit("salida S", from_entry = "S", stop = entryStop,
+             trail_points = trailAfterR * risk / syminfo.mintick,
+             trail_offset = trailOffset / syminfo.mintick)
+    else
+        strategy.exit("salida S", from_entry = "S", stop = entryStop, limit = target)
+
+// Cierre forzoso: el concurso solo puntua el P/L REALIZADO. Una posicion abierta
+// y ganadora al cierre no vale nada en la clasificacion.
+if inFlat
+    strategy.cancel_all()
+    if strategy.position_size != 0
+        strategy.close_all(comment = "cierre de sesion")
+
+// =============================================================================
+// Dibujo
+// =============================================================================
+
+plot(orReady ? orHigh : na, "Maximo del rango", color.new(color.teal, 0),
+     style = plot.style_linebr, linewidth = 2)
+plot(orReady ? orLow : na,  "Minimo del rango", color.new(color.maroon, 0),
+     style = plot.style_linebr, linewidth = 2)
+bgcolor(inOR ? color.new(color.blue, 92) : na, title = "Ventana de apertura")
+bgcolor(rangeOk and inEntry ? color.new(color.green, 95) : na, title = "Ventana de entradas")
+bgcolor(dayBlocked ? color.new(color.red, 90) : na, title = "Sesion bloqueada")
+
+var table info = table.new(position.top_right, 2, 6, border_width = 1)
+if barstate.islast
+    table.cell(info, 0, 0, "Multiplo de cuenta", text_color = color.gray, text_size = size.small)
+    table.cell(info, 1, 0, str.format("{0,number,#.##}x", equityMult), text_size = size.small)
+    table.cell(info, 0, 1, "Sesiones restantes", text_color = color.gray, text_size = size.small)
+    table.cell(info, 1, 1, str.format("{0,number,#.#}", daysLeft), text_size = size.small)
+    table.cell(info, 0, 2, "L* necesario", text_color = color.gray, text_size = size.small)
+    table.cell(info, 1, 2, str.format("{0,number,#.#}x", lStar), text_size = size.small)
+    table.cell(info, 0, 3, "Riesgo del proximo trade", text_color = color.gray, text_size = size.small)
+    table.cell(info, 1, 3, str.format("{0,number,#.##}%",
+         f_riskFraction(math.max(longRisk, syminfo.mintick)) * 100), text_size = size.small)
+    table.cell(info, 0, 4, "Contratos", text_color = color.gray, text_size = size.small)
+    table.cell(info, 1, 4, str.format("{0,number,#}",
+         f_qty(math.max(longRisk, syminfo.mintick))), text_size = size.small)
+    table.cell(info, 0, 5, "Rango / ATR", text_color = color.gray, text_size = size.small)
+    table.cell(info, 1, 5, na(atrDaily) or atrDaily == 0 ? "-" :
+         str.format("{0,number,#.##}", orRange / atrDaily), text_size = size.small)

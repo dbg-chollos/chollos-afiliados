@@ -1,0 +1,120 @@
+//@version=6
+// =============================================================================
+// Panel de riesgo para The Leap - cuanto arriesgar hoy segun donde estas
+// =============================================================================
+//
+// Indicador de apoyo, no operativo. Le dices en que multiplo va tu cuenta y te
+// dice, para cada objetivo, el apalancamiento optimo, la probabilidad de
+// alcanzarlo y los contratos que eso significa.
+//
+//     L* = sqrt(2 ln m) / (sigma sqrt(T))          apalancamiento optimo
+//     P* = Phi(S sqrt(T) - sqrt(2 ln m))           probabilidad en el optimo
+//
+// La probabilidad depende de tu Sharpe; el apalancamiento optimo, no. Si crees
+// que tu Sharpe es 3 y en realidad es 0, seguiras arriesgando lo correcto: solo
+// te equivocaras al estimar tus posibilidades. Derivacion en PLAN_TORNEO.md.
+
+indicator("Panel de riesgo - The Leap", overlay = true)
+
+grp = "Estado del concurso"
+equityNow   = input.float(100000, "Equity actual de la cuenta ($)", minval = 1, group = grp)
+equity0     = input.float(100000, "Equity inicial ($)", minval = 1, group = grp)
+contestEnd  = input.time(timestamp("2026-08-14T08:00:00+00:00"), "Fin del concurso", group = grp)
+daysTraded  = input.int(0, "Sesiones ya operadas", minval = 0,
+               tooltip = "The Leap exige un minimo de sesiones con operaciones para optar a premio.",
+               group = grp)
+minDays     = input.int(5, "Sesiones minimas exigidas", minval = 0, group = grp)
+
+grp2 = "Estrategia"
+sharpe      = input.float(1.0, "Sharpe anual estimado (sin apalancar)", step = 0.25,
+               tooltip = "Se honesto. Por encima de 2 es raro; 0 es lo que asume el escenario pesimista.",
+               group = grp2)
+sigmaAnnual = input.float(0.20, "Volatilidad anual del subyacente", minval = 0.01, step = 0.01,
+               group = grp2)
+stopPct     = input.float(0.30, "Distancia media del stop (% del precio)", minval = 0.01,
+               step = 0.05, group = grp2)
+marginPerCon = input.float(2500, "Margen por contrato ($)", minval = 1, group = grp2)
+
+grp3 = "Objetivos (multiplo de la cuenta inicial)"
+t1 = input.float(1.5,  "Objetivo 1", minval = 1.01, group = grp3)
+t2 = input.float(2.0,  "Objetivo 2", minval = 1.01, group = grp3)
+t3 = input.float(3.0,  "Objetivo 3", minval = 1.01, group = grp3)
+t4 = input.float(6.0,  "Objetivo 4", minval = 1.01, group = grp3)
+t5 = input.float(11.0, "Objetivo 5", minval = 1.01, group = grp3)
+
+// --- Funcion de distribucion normal (Abramowitz & Stegun 26.2.17) -------------
+// Pine no trae Phi. Error maximo 7,5e-8, mas que suficiente aqui.
+f_normcdf(float x) =>
+    float ax = math.abs(x)
+    float t  = 1.0 / (1.0 + 0.2316419 * ax)
+    float poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 +
+                 t * (-1.821255978 + t * 1.330274429))))
+    float nd = math.exp(-ax * ax / 2.0) / math.sqrt(2.0 * math.pi)
+    float upper = nd * poly            // P(X > ax)
+    x >= 0 ? 1.0 - upper : upper
+
+msLeft   = math.max(contestEnd - timenow, 0)
+daysLeft = math.max(msLeft / 86400000.0 * 5.0 / 7.0, 0.5)
+horizon  = daysLeft / 252.0
+mult     = equityNow / equity0
+
+// Apalancamiento optimo para el hueco que queda, no para el objetivo absoluto.
+f_lstar(float target) =>
+    float gap = math.max(target / math.max(mult, 0.01), 1.0000001)
+    math.sqrt(2.0 * math.log(gap)) / (sigmaAnnual * math.sqrt(horizon))
+
+f_pstar(float target) =>
+    float gap = math.max(target / math.max(mult, 0.01), 1.0000001)
+    f_normcdf(sharpe * math.sqrt(horizon) - math.sqrt(2.0 * math.log(gap)))
+
+// Tope duro por margen: nocional por contrato / margen por contrato.
+notionalPerCon = close * syminfo.pointvalue
+marginCap      = notionalPerCon / marginPerCon
+
+var table t = table.new(position.top_right, 6, 8, border_width = 1,
+     frame_color = color.gray, frame_width = 1)
+
+if barstate.islast
+    table.clear(t, 0, 0, 5, 7)
+
+    color hdr = color.new(color.gray, 80)
+    table.cell(t, 0, 0, "objetivo", bgcolor = hdr, text_size = size.small)
+    table.cell(t, 1, 0, "%/dia",    bgcolor = hdr, text_size = size.small)
+    table.cell(t, 2, 0, "L*",       bgcolor = hdr, text_size = size.small)
+    table.cell(t, 3, 0, "contratos",bgcolor = hdr, text_size = size.small)
+    table.cell(t, 4, 0, "riesgo/op",bgcolor = hdr, text_size = size.small)
+    table.cell(t, 5, 0, "prob.",    bgcolor = hdr, text_size = size.small)
+
+    float[] targets = array.from(t1, t2, t3, t4, t5)
+    for i = 0 to array.size(targets) - 1
+        float tgt   = array.get(targets, i)
+        float lstar = f_lstar(tgt)
+        float pstar = f_pstar(tgt)
+        float gap   = math.max(tgt / math.max(mult, 0.01), 1.0)
+        float perDay = math.pow(gap, 1.0 / daysLeft) - 1.0
+        float qty   = lstar * equityNow / notionalPerCon
+        float riskOp = lstar * stopPct / 100.0
+        bool  viable = lstar <= marginCap
+        color rowCol = viable ? color.new(color.green, 90) : color.new(color.red, 88)
+        int   row    = i + 1
+
+        table.cell(t, 0, row, str.format("{0,number,#.##}x", tgt), bgcolor = rowCol,
+             text_size = size.small)
+        table.cell(t, 1, row, str.format("{0,number,#.##}%", perDay * 100),
+             bgcolor = rowCol, text_size = size.small)
+        table.cell(t, 2, row, str.format("{0,number,#.#}x", lstar), bgcolor = rowCol,
+             text_size = size.small)
+        table.cell(t, 3, row, str.format("{0,number,#}", qty), bgcolor = rowCol,
+             text_size = size.small)
+        table.cell(t, 4, row, str.format("{0,number,#.#}%", riskOp * 100),
+             bgcolor = rowCol, text_size = size.small)
+        table.cell(t, 5, row, str.format("{0,number,#.#}%", pstar * 100),
+             bgcolor = rowCol, text_size = size.small)
+
+    string warn = daysTraded < minDays
+         ? str.format("FALTAN {0} SESIONES PARA CUALIFICAR", minDays - daysTraded)
+         : str.format("cuenta x{0,number,#.##} | {1,number,#.#} sesiones | tope margen {2,number,#.#}x",
+              mult, daysLeft, marginCap)
+    table.cell(t, 0, 7, warn, text_color = daysTraded < minDays ? color.red : color.gray,
+         text_size = size.small)
+    table.merge_cells(t, 0, 7, 5, 7)
